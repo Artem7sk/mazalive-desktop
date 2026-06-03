@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell, dialog } = require('electron')
+const { app, BrowserWindow, shell, dialog, session } = require('electron')
 const { autoUpdater } = require('electron-updater')
 const path = require('path')
 
@@ -12,6 +12,7 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      partition: 'persist:mazalive',
     },
     backgroundColor: '#07090f',
     show: false,
@@ -21,10 +22,22 @@ function createWindow() {
 
   win.once('ready-to-show', () => {
     win.show()
-    // Проверяем обновления через 3 секунды после запуска
     setTimeout(() => autoUpdater.checkForUpdatesAndNotify(), 3000)
   })
 
+  // Перехватываем редиректы после выхода
+  win.webContents.on('did-navigate', (event, url) => {
+    // Если перешли на страницу выхода — очищаем сессию
+    if (url.includes('/api/auth/signout') || url.includes('signout')) {
+      session.fromPartition('persist:mazalive').clearStorageData({
+        storages: ['cookies', 'localstorage', 'sessionstorage', 'indexdb']
+      }).then(() => {
+        win.loadURL('https://mazlive.com')
+      })
+    }
+  })
+
+  // Внешние ссылки открываем в браузере
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (!url.startsWith('https://mazlive.com')) {
       shell.openExternal(url)
