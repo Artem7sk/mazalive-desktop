@@ -1,0 +1,28 @@
+{
+  "name": "mazalive-desktop",
+  "version": "1.0.0",
+  "description": "MazaLive Desktop",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build-mac": "electron-builder --mac",
+    "build-win": "electron-builder --win"
+  },
+  "build": {
+    "appId": "com.mazalive.desktop",
+    "productName": "MazaLive",
+    "mac": {
+      "category": "public.app-category.entertainment",
+      "icon": "icon.icns",
+      "target": ["dmg", "zip"]
+    },
+    "win": {
+      "icon": "icon.ico",
+      "target": ["nsis"]
+    }
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.0.0"
+  }
+}
