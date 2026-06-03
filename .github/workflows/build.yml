@@ -17,11 +17,16 @@ jobs:
         run: npm install
       - name: Build Mac
         run: npm run build-mac
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+          ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: true
       - name: Upload Mac DMG
         uses: actions/upload-artifact@v4
         with:
           name: MazaLive-Mac
-          path: dist/*.dmg
+          path: |
+            dist/*.dmg
+            dist/*.zip
 
   build-win:
     runs-on: windows-latest
