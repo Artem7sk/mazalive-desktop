@@ -25,29 +25,41 @@ function createWindow() {
     setTimeout(() => autoUpdater.checkForUpdatesAndNotify(), 3000)
   })
 
-  // Перехватываем редиректы после выхода
-  win.webContents.on('did-navigate', (event, url) => {
-    // Если перешли на страницу выхода — очищаем сессию
-    if (url.includes('/api/auth/signout') || url.includes('signout')) {
-      session.fromPartition('persist:mazalive').clearStorageData({
-        storages: ['cookies', 'localstorage', 'sessionstorage', 'indexdb']
-      }).then(() => {
-        win.loadURL('https://mazlive.com')
-      })
-    }
-  })
-
-  // Внешние ссылки открываем в браузере
+  // Открываем ссылки в том же окне если это mazlive домен
   win.webContents.setWindowOpenHandler(({ url }) => {
-    if (!url.startsWith('https://mazlive.com')) {
+    const isMazalive = url.includes('mazlive.com') || 
+                       url.includes('mazlive.com') ||
+                       url.startsWith('https://games.mazlive.com')
+    if (!isMazalive) {
       shell.openExternal(url)
       return { action: 'deny' }
     }
     return { action: 'allow' }
   })
+
+  // Навигация в том же окне для mazlive доменов
+  win.webContents.on('will-navigate', (event, url) => {
+    const isMazalive = url.includes('mazlive.com') ||
+                       url.includes('mazlive.com')
+    if (!isMazalive) {
+      event.preventDefault()
+      shell.openExternal(url)
+    }
+  })
+
+  // Новые окна для mazlive открываем в том же окне
+  win.webContents.on('new-window', (event, url) => {
+    const isMazalive = url.includes('mazlive.com')
+    if (isMazalive) {
+      event.preventDefault()
+      win.loadURL(url)
+    } else {
+      event.preventDefault()
+      shell.openExternal(url)
+    }
+  })
 }
 
-// Автообновление
 autoUpdater.on('update-available', () => {
   dialog.showMessageBox({
     type: 'info',
