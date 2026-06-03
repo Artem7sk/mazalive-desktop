@@ -1,4 +1,5 @@
-const { app, BrowserWindow, shell } = require('electron')
+const { app, BrowserWindow, shell, dialog } = require('electron')
+const { autoUpdater } = require('electron-updater')
 const path = require('path')
 
 function createWindow() {
@@ -8,7 +9,6 @@ function createWindow() {
     minWidth: 900,
     minHeight: 600,
     title: 'MazaLive',
-    icon: path.join(__dirname, 'icon.png'),
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -17,15 +17,14 @@ function createWindow() {
     show: false,
   })
 
-  // Загружаем mazlive.com
   win.loadURL('https://mazlive.com')
 
-  // Показываем окно когда загрузилось
   win.once('ready-to-show', () => {
     win.show()
+    // Проверяем обновления через 3 секунды после запуска
+    setTimeout(() => autoUpdater.checkForUpdatesAndNotify(), 3000)
   })
 
-  // Внешние ссылки открываем в браузере
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (!url.startsWith('https://mazlive.com')) {
       shell.openExternal(url)
@@ -34,6 +33,31 @@ function createWindow() {
     return { action: 'allow' }
   })
 }
+
+// Автообновление
+autoUpdater.on('update-available', () => {
+  dialog.showMessageBox({
+    type: 'info',
+    title: 'Доступно обновление',
+    message: 'Новая версия MazaLive доступна. Скачиваем...',
+    buttons: ['OK']
+  })
+})
+
+autoUpdater.on('update-downloaded', () => {
+  dialog.showMessageBox({
+    type: 'info',
+    title: 'Обновление готово',
+    message: 'Обновление загружено. Перезапустить сейчас?',
+    buttons: ['Перезапустить', 'Позже']
+  }).then(result => {
+    if (result.response === 0) autoUpdater.quitAndInstall()
+  })
+})
+
+autoUpdater.on('error', (err) => {
+  console.log('AutoUpdater error:', err)
+})
 
 app.whenReady().then(() => {
   createWindow()

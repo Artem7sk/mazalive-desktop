@@ -2,7 +2,8 @@ name: Build MazaLive Desktop
 
 on:
   push:
-    branches: [main]
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 jobs:
@@ -15,18 +16,11 @@ jobs:
           node-version: 20
       - name: Install dependencies
         run: npm install
-      - name: Build Mac
+      - name: Build and publish Mac
         run: npm run build-mac
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
-          ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: true
-      - name: Upload Mac DMG
-        uses: actions/upload-artifact@v4
-        with:
-          name: MazaLive-Mac
-          path: |
-            dist/*.dmg
-            dist/*.zip
 
   build-win:
     runs-on: windows-latest
@@ -37,10 +31,7 @@ jobs:
           node-version: 20
       - name: Install dependencies
         run: npm install
-      - name: Build Windows
+      - name: Build and publish Windows
         run: npm run build-win
-      - name: Upload Windows EXE
-        uses: actions/upload-artifact@v4
-        with:
-          name: MazaLive-Windows
-          path: dist/*.exe
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

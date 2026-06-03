@@ -25,11 +25,16 @@
         "nsis"
       ]
     },
-    "publish": null
+    "publish": {
+      "provider": "github",
+      "owner": "Artem7sk",
+      "repo": "mazalive-desktop"
+    }
   },
   "devDependencies": {
     "electron": "^28.0.0",
-    "electron-builder": "^24.0.0"
+    "electron-builder": "^24.0.0",
+    "electron-updater": "^6.1.0"
   },
   "author": "MazaLive"
 }
