@@ -13,9 +13,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm install
-      - run: npm run build-mac
-      - uses: actions/upload-artifact@v4
+      - name: Install dependencies
+        run: npm install
+      - name: Build Mac
+        run: npm run build-mac
+      - name: Upload Mac DMG
+        uses: actions/upload-artifact@v4
         with:
           name: MazaLive-Mac
           path: dist/*.dmg
@@ -27,9 +30,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm install
-      - run: npm run build-win
-      - uses: actions/upload-artifact@v4
+      - name: Install dependencies
+        run: npm install
+      - name: Build Windows
+        run: npm run build-win
+      - name: Upload Windows EXE
+        uses: actions/upload-artifact@v4
         with:
           name: MazaLive-Windows
           path: dist/*.exe
