@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' https://mazlive.com https://games.mazlive.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' https: data:;"/>
+<title>Mazlive</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Syne:wght@400;600;700&display=swap" rel="stylesheet"/>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --purple:#a855f7;--blue:#3b82f6;--cyan:#06b6d4;
+    --bg:#0d1117;--surface:#161b22;--border:#30363d;
+    --text:#e6edf3;--muted:#8b949e;
+  }
+  body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;height:100vh;overflow:hidden}
+  /* grid bg */
+  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(168,85,247,.04)1px,transparent 1px),linear-gradient(90deg,rgba(168,85,247,.04)1px,transparent 1px);background-size:50px 50px;pointer-events:none}
+
+  .screen{display:none;height:100vh;flex-direction:column;align-items:center;justify-content:center;padding:24px}
+  .screen.active{display:flex}
+
+  /* ── LOADING ── */
+  #screen-loading .logo{font-family:'Orbitron',monospace;font-size:32px;font-weight:900;background:linear-gradient(135deg,#a855f7,#3b82f6,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:16px}
+  .spinner{width:40px;height:40px;border:3px solid rgba(168,85,247,.2);border-top-color:var(--purple);border-radius:50%;animation:spin 1s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* ── MAIN ── */
+  #screen-main{align-items:stretch;padding:0}
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-bottom:1px solid var(--border);background:rgba(22,27,46,.9);backdrop-filter:blur(10px)}
+  .topbar-logo{font-family:'Orbitron',monospace;font-size:18px;font-weight:900}
+  .topbar-logo span{background:linear-gradient(135deg,#a855f7,#3b82f6);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  .user-info{display:flex;align-items:center;gap:12px}
+  .avatar{width:32px;height:32px;border-radius:50%;border:2px solid var(--purple);object-fit:cover}
+  .badge-pro{background:linear-gradient(135deg,rgba(168,85,247,.2),rgba(59,130,246,.2));border:1px solid rgba(168,85,247,.4);color:#c084fc;font-size:11px;font-family:'Orbitron',monospace;padding:3px 10px;border-radius:99px}
+  .badge-free{background:rgba(48,54,61,.5);border:1px solid var(--border);color:var(--muted);font-size:11px;font-family:'Orbitron',monospace;padding:3px 10px;border-radius:99px}
+  .btn-logout{background:transparent;border:1px solid var(--border);color:var(--muted);padding:6px 14px;border-radius:8px;cursor:pointer;font-size:12px;transition:all .2s}
+  .btn-logout:hover{border-color:var(--purple);color:var(--text)}
+
+  .main-content{flex:1;overflow-y:auto;padding:24px}
+  .section-title{font-family:'Orbitron',monospace;font-size:13px;letter-spacing:2px;color:var(--purple);margin-bottom:16px;opacity:.8}
+
+  /* Status card */
+  .status-card{background:linear-gradient(135deg,rgba(22,27,46,.8),rgba(13,17,23,.9));border:1px solid rgba(168,85,247,.2);border-radius:16px;padding:20px 24px;margin-bottom:24px;display:flex;align-items:center;justify-content:space-between}
+  .status-card.free{border-color:rgba(234,179,8,.2)}
+  .status-info h3{font-size:15px;font-weight:700;margin-bottom:4px}
+  .status-info p{font-size:13px;color:var(--muted)}
+  .btn-upgrade{background:linear-gradient(135deg,#a855f7,#3b82f6);color:#fff;border:none;padding:10px 20px;border-radius:10px;cursor:pointer;font-family:'Orbitron',monospace;font-size:12px;font-weight:700;transition:all .2s}
+  .btn-upgrade:hover{transform:scale(1.05);box-shadow:0 0 20px rgba(168,85,247,.4)}
+
+  /* Games grid */
+  .games-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
+  .game-card{background:linear-gradient(135deg,rgba(22,27,46,.8),rgba(13,17,23,.9));border:1px solid rgba(48,54,61,.6);border-radius:14px;padding:18px;cursor:pointer;transition:all .25s;position:relative;overflow:hidden}
+  .game-card:hover:not(.locked){border-color:rgba(168,85,247,.5);transform:translateY(-3px);box-shadow:0 16px 32px rgba(0,0,0,.4),0 0 20px rgba(168,85,247,.1)}
+  .game-card.locked{opacity:.55;cursor:default}
+  .game-card.launching{border-color:var(--cyan);box-shadow:0 0 20px rgba(6,182,212,.3)}
+  .game-emoji{font-size:32px;margin-bottom:10px}
+  .game-name{font-family:'Orbitron',monospace;font-size:13px;font-weight:700;margin-bottom:6px}
+  .game-desc{font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:14px}
+  .game-footer{display:flex;align-items:center;justify-content:space-between}
+  .game-tag{font-size:10px;font-family:'Orbitron',monospace;padding:3px 8px;border-radius:99px}
+  .tag-free{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:#4ade80}
+  .tag-pro{background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.3);color:#c084fc}
+  .tag-locked{background:rgba(48,54,61,.5);border:1px solid var(--border);color:var(--muted)}
+  .btn-launch{background:linear-gradient(135deg,#a855f7,#3b82f6);color:#fff;border:none;padding:7px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;transition:all .2s}
+  .btn-launch:hover{transform:scale(1.05)}
+  .btn-launch:disabled{opacity:.5;cursor:not-allowed;transform:none}
+  .lock-icon{font-size:18px;color:var(--muted)}
+
+  /* Toast */
+  .toast{position:fixed;bottom:24px;right:24px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 18px;font-size:13px;z-index:1000;transform:translateY(80px);opacity:0;transition:all .3s;max-width:320px}
+  .toast.show{transform:translateY(0);opacity:1}
+  .toast.success{border-color:rgba(34,197,94,.4);color:#4ade80}
+  .toast.error{border-color:rgba(239,68,68,.4);color:#f87171}
+  .toast.info{border-color:rgba(168,85,247,.4);color:#c084fc}
+
+  /* modal */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);z-index:500;display:none;align-items:center;justify-content:center}
+  .modal-overlay.open{display:flex}
+  .modal{background:var(--surface);border:1px solid rgba(168,85,247,.3);border-radius:20px;padding:32px;max-width:420px;width:90%;text-align:center}
+  .modal h2{font-family:'Orbitron',monospace;font-size:18px;margin-bottom:12px}
+  .modal p{color:var(--muted);font-size:14px;line-height:1.6;margin-bottom:24px}
+  .modal-btns{display:flex;gap:10px;justify-content:center}
+  .btn-modal-primary{background:linear-gradient(135deg,#a855f7,#3b82f6);color:#fff;border:none;padding:12px 24px;border-radius:10px;cursor:pointer;font-weight:700;font-size:14px;transition:all .2s}
+  .btn-modal-primary:hover{transform:scale(1.05)}
+  .btn-modal-secondary{background:transparent;color:var(--muted);border:1px solid var(--border);padding:12px 24px;border-radius:10px;cursor:pointer;font-size:14px;transition:all .2s}
+  .btn-modal-secondary:hover{border-color:var(--purple);color:var(--text)}
+</style>
+</head>
+<body>
+
+<!-- Loading screen -->
+<div id="screen-loading" class="screen active">
+  <div class="logo">MAZA<span>LIVE</span></div>
+  <div class="spinner"></div>
+</div>
+
+<!-- Main app -->
+<div id="screen-main" class="screen">
+  <div class="topbar">
+    <div class="topbar-logo">MAZA<span>LIVE</span></div>
+    <div class="user-info">
+      <img id="user-avatar" class="avatar" src="" alt="" style="display:none"/>
+      <span id="user-name" style="font-size:14px"></span>
+      <span id="plan-badge" class="badge-free">FREE</span>
+      <button class="btn-logout" onclick="handleLogout()">Выйти</button>
+    </div>
+  </div>
+
+  <div class="main-content">
+    <!-- Status -->
+    <div id="status-card" class="status-card free">
+      <div class="status-info">
+        <h3 id="status-title">Бесплатный план</h3>
+        <p id="status-desc">Обнови до Pro для доступа ко всем играм</p>
+      </div>
+      <button class="btn-upgrade" id="btn-upgrade" onclick="handleUpgrade()">⚡ Купить Pro</button>
+    </div>
+
+    <!-- Games -->
+    <div class="section-title">// КАТАЛОГ ИГР</div>
+    <div class="games-grid" id="games-grid"></div>
+  </div>
+</div>
+
+<!-- Modal: subscription required -->
+<div class="modal-overlay" id="modal-sub">
+  <div class="modal">
+    <div style="font-size:48px;margin-bottom:16px">⚡</div>
+    <h2>НУЖЕН PRO</h2>
+    <p>Эта игра доступна только в Pro-плане.<br/>$9.99 / месяц — карта или крипта.</p>
+    <div class="modal-btns">
+      <button class="btn-modal-primary" onclick="handleUpgrade();closeModal('modal-sub')">Купить Pro</button>
+      <button class="btn-modal-secondary" onclick="closeModal('modal-sub')">Позже</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const api = window.mazalive
+
+const GAMES = [
+  {slug:'wheel-of-fortune',name:'Колесо Фортуны',desc:'Зрители крутят — стример выполняет задание',emoji:'🎡',isPro:false},
+  {slug:'quiz-battle',name:'Квиз Батл',desc:'Командная викторина в реальном времени',emoji:'🧠',isPro:true},
+  {slug:'word-bomb',name:'Словесная Бомба',desc:'Назови слово до взрыва!',emoji:'💣',isPro:true},
+  {slug:'prediction',name:'Предсказания',desc:'Ставки на исход событий',emoji:'🔮',isPro:true},
+  {slug:'vote',name:'Голосование',desc:'Зрители голосуют за действие',emoji:'🗳️',isPro:true},
+  {slug:'gifts-race',name:'Гонка Подарков',desc:'Кто пришлёт больше подарков',emoji:'🎁',isPro:true},
+]
+
+let currentUser = null
+let userPlan = 'free'
+
+async function init() {
+  const user = await api.getUser()
+  if (!user) {
+    // Не авторизован — закрываем (main.ts откроет auth window)
+    return
+  }
+
+  currentUser = user
+  renderUser(user)
+  renderGames()
+  show('screen-main')
+  hide('screen-loading')
+
+  // Слушаем события от main process
+  api.onSubscriptionRequired(() => openModal('modal-sub'))
+  api.onGameLaunched(({gameSlug}) => showToast(`▶ ${gameSlug} запущена!`, 'success'))
+  api.onError(({message}) => showToast(message, 'error'))
+}
+
+function renderUser(user) {
+  const planBadge = document.getElementById('plan-badge')
+  const avatar = document.getElementById('user-avatar')
+  document.getElementById('user-name').textContent = user.name || user.email
+
+  if (user.plan === 'pro') {
+    userPlan = 'pro'
+    planBadge.textContent = 'PRO'
+    planBadge.className = 'badge-pro'
+    document.getElementById('status-card').classList.remove('free')
+    document.getElementById('status-title').textContent = 'Pro активен'
+    document.getElementById('status-desc').textContent = 'Все игры доступны. Удачного стрима!'
+    document.getElementById('btn-upgrade').textContent = '✓ Активен'
+    document.getElementById('btn-upgrade').disabled = true
+    document.getElementById('btn-upgrade').style.opacity = '0.6'
+  }
+
+  if (user.image) {
+    avatar.src = user.image
+    avatar.style.display = 'block'
+  }
+}
+
+function renderGames() {
+  const grid = document.getElementById('games-grid')
+  grid.innerHTML = GAMES.map(game => {
+    const canPlay = !game.isPro || userPlan === 'pro'
+    const tagClass = canPlay ? (game.isPro ? 'tag-pro' : 'tag-free') : 'tag-locked'
+    const tagText = canPlay ? (game.isPro ? 'PRO' : 'FREE') : '🔒 PRO'
+
+    return `<div class="game-card ${canPlay ? '' : 'locked'}" id="card-${game.slug}">
+      <div class="game-emoji">${game.emoji}</div>
+      <div class="game-name">${game.name}</div>
+      <div class="game-desc">${game.desc}</div>
+      <div class="game-footer">
+        <span class="game-tag ${tagClass}">${tagText}</span>
+        ${canPlay
+          ? `<button class="btn-launch" id="btn-${game.slug}" onclick="launchGame('${game.slug}')">▶ Запуск</button>`
+          : `<span class="lock-icon">🔒</span>`
+        }
+      </div>
+    </div>`
+  }).join('')
+
+  // Клик по заблокированной карточке
+  GAMES.filter(g => g.isPro && userPlan !== 'pro').forEach(game => {
+    document.getElementById(`card-${game.slug}`)?.addEventListener('click', () => {
+      openModal('modal-sub')
+    })
+  })
+}
+
+async function launchGame(gameSlug) {
+  const btn = document.getElementById(`btn-${gameSlug}`)
+  const card = document.getElementById(`card-${gameSlug}`)
+  if (!btn) return
+
+  btn.disabled = true
+  btn.textContent = '⟳ Запуск...'
+  card?.classList.add('launching')
+
+  try {
+    // Создаём игровую сессию через сайт
+    const WEB_URL = 'https://mazlive.com'
+    const res = await fetch(`${WEB_URL}/api/games/session`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ gameSlug }),
+    })
+
+    if (!res.ok) {
+      const err = await res.json()
+      if (res.status === 403) { openModal('modal-sub'); return }
+      throw new Error(err.error || 'Server error')
+    }
+
+    const { roomId } = await res.json()
+    await api.launchGame(gameSlug, roomId)
+  } catch (e) {
+    showToast('Ошибка запуска: ' + (e.message || 'попробуй снова'), 'error')
+  } finally {
+    setTimeout(() => {
+      if (btn) { btn.disabled = false; btn.textContent = '▶ Запуск' }
+      card?.classList.remove('launching')
+    }, 2000)
+  }
+}
+
+async function handleLogout() {
+  await api.logout()
+}
+
+function handleUpgrade() {
+  api.openBrowser('https://mazlive.com/dashboard')
+  showToast('Открываем страницу оплаты в браузере...', 'info')
+}
+
+// Utils
+function show(id) { document.getElementById(id).classList.add('active') }
+function hide(id) { document.getElementById(id).classList.remove('active') }
+function openModal(id) { document.getElementById(id).classList.add('open') }
+function closeModal(id) { document.getElementById(id).classList.remove('open') }
+
+let toastTimer
+function showToast(msg, type = 'info') {
+  const t = document.getElementById('toast')
+  t.textContent = msg
+  t.className = `toast show ${type}`
+  clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => t.classList.remove('show'), 4000)
+}
+
+init()
+</script>
+</body>
+</html>
