@@ -81,8 +81,8 @@ function createMainWindow() {
     },
   })
 
-  // Грузим UI из встроенных файлов
-  mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'))
+  // Приложение показывает сайт — кабинет стримера
+  mainWindow.loadURL(WEB_URL + '/dashboard')
   mainWindow.setMenuBarVisibility(false)
 
   if (DEV) {
