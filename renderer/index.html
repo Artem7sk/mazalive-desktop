@@ -103,6 +103,7 @@
       <img id="user-avatar" class="avatar" src="" alt="" style="display:none"/>
       <span id="user-name" style="font-size:14px"></span>
       <span id="plan-badge" class="badge-free">FREE</span>
+      <button class="btn-logout" id="btn-update" onclick="handleCheckUpdates()" title="Проверить обновления">⟳ Обновления</button>
       <button class="btn-logout" onclick="handleLogout()">Выйти</button>
     </div>
   </div>
@@ -262,6 +263,22 @@ async function launchGame(gameSlug) {
 
 async function handleLogout() {
   await api.logout()
+}
+
+function handleCheckUpdates() {
+  if (window.mazalive && window.mazalive.checkUpdates) {
+    window.mazalive.checkUpdates()
+    showToast('Проверяем обновления…', 'info')
+  }
+}
+
+// Прогресс загрузки обновления
+if (window.mazalive && window.mazalive.onUpdateProgress) {
+  window.mazalive.onUpdateProgress((d) => {
+    const btn = document.getElementById('btn-update')
+    if (btn) btn.textContent = `⟳ Загрузка ${d.percent}%`
+    showToast(`Загрузка обновления: ${d.percent}%`, 'info')
+  })
 }
 
 function handleUpgrade() {

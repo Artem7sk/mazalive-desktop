@@ -5,10 +5,15 @@ import {
   session,
   protocol,
   shell,
+  Menu,
+  dialog,
 } from 'electron'
 import path from 'path'
 import axios from 'axios'
+import { autoUpdater } from 'electron-updater'
 import { tokenStore } from './auth/tokenStore'
+
+const APP_VERSION = app.getVersion()
 
 const WEB_URL = process.env.WEB_URL || 'https://mazlive.com'
 const GAME_SERVER_URL = process.env.GAME_SERVER_URL || 'https://games.mazlive.com'
@@ -47,6 +52,7 @@ function createAuthWindow() {
   })
 
   authWindow.loadURL(`${WEB_URL}/login?from=electron`)
+  authWindow.setMenu(null)
   authWindow.setMenuBarVisibility(false)
 
   // Перехватываем навигацию для получения session token
@@ -83,6 +89,7 @@ function createMainWindow() {
 
   // Приложение показывает сайт — кабинет стримера
   mainWindow.loadURL(WEB_URL + '/dashboard')
+  mainWindow.setMenu(null)
   mainWindow.setMenuBarVisibility(false)
 
   if (DEV) {
@@ -121,7 +128,9 @@ async function createGameWindow(gameSlug: string, roomId: string, roomToken: str
     },
   })
 
+  gameWindow.setMenu(null)
   gameWindow.setMenuBarVisibility(false)
+  gameWindow.setAutoHideMenuBar(true)
 
   // ✅ БЕЗОПАСНОСТЬ: игра загружается ТОЛЬКО с нашего сервера
   // Исходный HTML/JS никогда не попадает на диск пользователя
@@ -322,4 +331,90 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
+})
+
+// =============================================================
+// АВТО-ОБНОВЛЕНИЕ (electron-updater, провайдер generic)
+// Проверяем обновление при старте + по IPC-запросу из renderer.
+// Пользователю показываем нативное окно: «Доступно обновление» → Обновить.
+// =============================================================
+autoUpdater.autoDownload = false          // не качаем молча — спрашиваем
+autoUpdater.autoInstallOnAppQuit = true
+autoUpdater.logger = null
+
+function checkForUpdates(interactive = false) {
+  // Авто-обновление не работает в dev-режиме
+  if (DEV) {
+    if (interactive) dialog.showMessageBox({ message: 'Обновления отключены в режиме разработки' })
+    return
+  }
+  autoUpdater.checkForUpdates().catch((err) => {
+    console.log('[Updater] check failed:', err?.message)
+    if (interactive) {
+      dialog.showMessageBox(mainWindow ?? undefined as any, {
+        type: 'info',
+        title: 'Обновление',
+        message: 'Не удалось проверить обновления. Проверьте интернет.',
+      })
+    }
+  })
+}
+
+autoUpdater.on('update-available', (info) => {
+  dialog
+    .showMessageBox(mainWindow ?? undefined as any, {
+      type: 'info',
+      title: 'Доступно обновление',
+      message: `Вышла новая версия Mazlive ${info.version}`,
+      detail: `У вас установлена ${APP_VERSION}. Обновить сейчас? Приложение загрузит новую версию и перезапустится.`,
+      buttons: ['Обновить', 'Позже'],
+      defaultId: 0,
+      cancelId: 1,
+    })
+    .then((res) => {
+      if (res.response === 0) {
+        autoUpdater.downloadUpdate().catch(() => {})
+      }
+    })
+})
+
+autoUpdater.on('update-not-available', () => {
+  console.log('[Updater] already up to date:', APP_VERSION)
+})
+
+autoUpdater.on('download-progress', (p) => {
+  mainWindow?.webContents.send('update-progress', { percent: Math.round(p.percent) })
+})
+
+autoUpdater.on('update-downloaded', (info) => {
+  dialog
+    .showMessageBox(mainWindow ?? undefined as any, {
+      type: 'info',
+      title: 'Обновление готово',
+      message: `Mazlive ${info.version} загружено`,
+      detail: 'Перезапустить приложение сейчас, чтобы применить обновление?',
+      buttons: ['Перезапустить', 'Позже'],
+      defaultId: 0,
+      cancelId: 1,
+    })
+    .then((res) => {
+      if (res.response === 0) {
+        setImmediate(() => autoUpdater.quitAndInstall())
+      }
+    })
+})
+
+autoUpdater.on('error', (err) => {
+  console.log('[Updater] error:', err?.message)
+})
+
+// Ручной запрос проверки из renderer (кнопка «Проверить обновления»)
+ipcMain.handle('check-updates', () => {
+  checkForUpdates(true)
+  return APP_VERSION
+})
+
+// Проверяем обновление через 5 сек после старта (не тормозим запуск)
+app.whenReady().then(() => {
+  setTimeout(() => checkForUpdates(false), 5000)
 })

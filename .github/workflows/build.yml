@@ -19,11 +19,19 @@ jobs:
           node-version: 20
       - name: Install dependencies
         run: npm install
-      - name: Build and publish Mac
+      - name: Build Mac
         run: npm run build-mac
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Upload mac artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mazlive-mac
+          path: |
+            dist/*.zip
+            dist/*.dmg
+            dist/latest-mac.yml
 
   build-win:
     runs-on: windows-latest
@@ -34,15 +42,17 @@ jobs:
           node-version: 20
       - name: Install dependencies
         run: npm install
-      - name: Build and publish Windows
+      - name: Build Windows
         run: npm run build-win
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: false
 
-      - name: Upload installer
+      # latest.yml обязателен для авто-обновления (electron-updater)
+      - name: Upload installer + update manifest
         uses: actions/upload-artifact@v4
         with:
           name: Mazlive-Setup-Windows
           path: |
             dist/*.exe
             dist/*.msi
+            dist/latest.yml
