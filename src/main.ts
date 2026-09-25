@@ -54,6 +54,7 @@ function createAuthWindow() {
   authWindow.loadURL(`${WEB_URL}/login?from=electron`)
   authWindow.setMenu(null)
   authWindow.setMenuBarVisibility(false)
+  authWindow.setAutoHideMenuBar(true)
 
   // Перехватываем навигацию для получения session token
   authWindow.webContents.on('did-navigate', async (_event, url) => {
@@ -91,6 +92,7 @@ function createMainWindow() {
   mainWindow.loadURL(WEB_URL + '/dashboard')
   mainWindow.setMenu(null)
   mainWindow.setMenuBarVisibility(false)
+  mainWindow.setAutoHideMenuBar(true)
 
   if (DEV) {
     mainWindow.webContents.openDevTools()
@@ -314,6 +316,11 @@ app.on('open-url', (_event, url) => {
 // App lifecycle
 // =============================================================
 app.whenReady().then(() => {
+  // 🚫 ГЛОБАЛЬНО убираем меню приложения (Файл/Правка/Вид...).
+  // setMenu(null) на окне ненадёжен на Windows (Alt показывает меню), поэтому
+  // снимаем меню на уровне всего приложения — это работает во ВСЕХ окнах.
+  Menu.setApplicationMenu(null)
+
   // Проверяем, залогинен ли пользователь
   if (tokenStore.isLoggedIn()) {
     createMainWindow()
