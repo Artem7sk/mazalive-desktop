@@ -56,7 +56,8 @@
     },
     "publish": {
       "provider": "generic",
-      "url": "https://mazlive.com/api/updates/"
+      "url": "https://mazlive.com/api/updates/beta/",
+      "channel": "beta"
     }
   }
 }

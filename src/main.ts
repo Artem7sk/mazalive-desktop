@@ -28,6 +28,13 @@ import { GtaAgent } from '../agent/gta-agent.mjs'
 
 const APP_VERSION = app.getVersion()
 
+// ── ИЗОЛЯЦИЯ БЕТЫ ОТ СТАБИЛЬНОГО ПРИЛОЖЕНИЯ ──
+// Стабильное: name "Mazlive", userData %APPDATA%\Mazlive, appId com.mazalive.desktop
+// Бета:       name "Mazlive Desktop 2", userData %APPDATA%\Mazlive Desktop 2
+// Явно фиксируем appName → electron-store/сессия НЕ пересекаются со стабильной версией,
+// даже если productName/package name когда-то совпадут.
+app.setName('Mazlive Desktop 2')
+
 const WEB_URL = process.env.WEB_URL || 'https://mazlive.com'
 const GAME_SERVER_URL = process.env.GAME_SERVER_URL || 'https://games.mazlive.com'
 const GAME_SERVER_SOCKET_URL = process.env.GAME_SERVER_SOCKET_URL || 'https://games.mazlive.com/viewer'
