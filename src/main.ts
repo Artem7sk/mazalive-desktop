@@ -834,7 +834,7 @@ async function showGtaModal(kind: 'sub' | 'auth') {
       ? 'Игра «GTA V — Царь горы» доступна по подписке PRO.'
       : 'Чтобы запустить игру, войдите в аккаунт MAZLIVE.',
     detail: isSub
-      ? 'Оформите подписку PRO на сайте — после этого игра станет доступна в этом приложении.'
+      ? 'Оформите подписку PRO в личном кабинете (Профиль → «Получить Pro») — после оплаты игра станет доступна в этом приложении.'
       : 'Нажмите «Войти», чтобы авторизоваться в браузере, затем вернитесь в приложение.',
     buttons: isSub ? ['Оформить подписку', 'Позже'] : ['Войти', 'Позже'],
     defaultId: 0,
@@ -842,7 +842,7 @@ async function showGtaModal(kind: 'sub' | 'auth') {
     noLink: true,
   })
   if (response === 0) {
-    shell.openExternal(isSub ? `${WEB_URL}/vip` : `${WEB_URL}/login?from=electron`)
+    shell.openExternal(isSub ? `${WEB_URL}/profile` : `${WEB_URL}/login?from=electron`)
   }
 }
 
