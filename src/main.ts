@@ -54,6 +54,7 @@ let gameWindow: BrowserWindow | null = null
 
 // ─── GTA desktop-game runtime ───
 let gtaAgent: any | null = null
+let gtaRefreshTimer: ReturnType<typeof setInterval> | null = null
 let gtaState: {
   gamePath: string | null
   modInstalled: boolean
@@ -229,6 +230,10 @@ async function injectGtaCard(): Promise<boolean> {
   } catch {
     coverCss = 'background:linear-gradient(135deg,#a855f7,#3b82f6);'
   }
+  // Ник эфира (для ярлыка кнопки)
+  let nick = ''
+  try { nick = await getTikTokUsername() } catch {}
+  const btnLabel = nick ? '🔴 Подключить эфир' : '▶ Настроить мод'
   const script = `(() => {
     if (document.getElementById('__beta_gta_card')) return true;
     // Ищем сетку каталога игр: контейнер с НАИБОЛЬШИМ числом карточек,
@@ -259,7 +264,7 @@ async function injectGtaCard(): Promise<boolean> {
       <div style="font-size:12px;color:#e6edf3;line-height:1.5;margin-bottom:12px;text-shadow:0 1px 6px rgba(0,0,0,.9)">Локальная игра: подарки, лайки и follow управляют боем в GTA V (Story Mode). Работает на этом ПК.</div>
       <div style="display:flex;align-items:center;justify-content:space-between">
         <span style="font-size:10px;padding:3px 8px;border-radius:99px;background:rgba(168,85,247,.25);border:1px solid rgba(168,85,247,.55);color:#e9d5ff">🔒 PRO</span>
-        <button id="__beta_gta_launch" style="background:linear-gradient(135deg,#a855f7,#3b82f6);color:#fff;border:none;padding:7px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600">▶ Запуск</button>
+        <button id="__beta_gta_launch" style="background:linear-gradient(135deg,#a855f7,#3b82f6);color:#fff;border:none;padding:7px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600">${btnLabel}</button>
       </div>
       </div>\`;
     grid.appendChild(card);
@@ -503,6 +508,7 @@ async function startDesktopGame(gameSlug: string, roomId: string, roomToken: str
 async function startAgent(gamePath: string, roomId: string, roomToken: string, user: any) {
   // Останавливаем предыдущий агент
   if (gtaAgent) { try { gtaAgent.disconnect() } catch {} gtaAgent = null }
+  if (gtaRefreshTimer) { clearInterval(gtaRefreshTimer); gtaRefreshTimer = null }
 
   // ЛЕНИВАЯ загрузка ESM-агента через CJS-обёртку (нативный import()).
   // Если модуль недоступен — бросаем наверх, НЕ блокируя вход и web-игры.
@@ -529,6 +535,19 @@ async function startAgent(gamePath: string, roomId: string, roomToken: string, u
   }).catch((e: any) => {
     sendToMain('gta-agent-status', { kind: 'error', message: 'Ошибка агента: ' + e.message })
   })
+
+  // Токен живёт 15 мин → обновляем каждые 12 мин, иначе /streamer отвалится.
+  gtaRefreshTimer = setInterval(async () => {
+    try {
+      const tk = tokenStore.getToken()
+      if (!tk || !gtaAgent) return
+      const r = await axios.get(`${WEB_URL}/api/auth/verify-subscription`, {
+        headers: { Authorization: `Bearer ${tk}` },
+        timeout: 15000,
+      })
+      if (r.data?.valid && r.data?.roomToken) gtaAgent.refreshToken(r.data.roomToken)
+    } catch { /* реконнект сам повторит */ }
+  }, 12 * 60 * 1000)
 }
 
 /**
@@ -537,7 +556,7 @@ async function startAgent(gamePath: string, roomId: string, roomToken: string, u
  * тогда панель показывает онбординг: поиск/выбор папки, зависимости, установку мода.
  * roomId может быть пустым (запуск из каталога до создания игровой сессии).
  */
-function openGtaPanelWindow(gamePath: string | null, roomId: string) {
+function openGtaPanelWindow(gamePath: string | null, roomId: string, roomToken = '') {
   // Если панель уже открыта — фокусируем и обновляем параметры
   if (gameWindow && !gameWindow.isDestroyed()) {
     gameWindow.close()
@@ -559,9 +578,25 @@ function openGtaPanelWindow(gamePath: string | null, roomId: string) {
   })
   gameWindow.setMenu(null)
   gameWindow.setMenuBarVisibility(false)
-  const q = new URLSearchParams({ gamePath: gamePath || '', roomId: roomId || '' })
+  // roomToken передаём в панель отдельным query-параметром (живёт только в памяти окна).
+  const q = new URLSearchParams({ gamePath: gamePath || '', roomId: roomId || '', roomToken: roomToken || '' })
   gameWindow.loadFile(path.join(__dirname, '..', 'renderer', 'gta-panel.html'), { search: '?' + q.toString() })
   gameWindow.on('closed', () => { gameWindow = null })
+}
+
+/** Ник TikTok из дашборда (cookie tiktok_username). Пусто — эфир не настроен. */
+async function getTikTokUsername(): Promise<string> {
+  try {
+    for (const sess of [session.defaultSession, session.fromPartition('persist:game')]) {
+      const cookies = await sess.cookies.get({ name: 'tiktok_username' })
+      const v = cookies?.[0]?.value
+      if (v) return String(v).replace('@', '').trim().toLowerCase()
+    }
+    const all = await session.defaultSession.cookies.get({ url: WEB_URL })
+    const c = all.find((x) => x.name === 'tiktok_username')
+    if (c?.value) return String(c.value).replace('@', '').trim().toLowerCase()
+  } catch { /* нет cookie — эфир не подключён */ }
+  return ''
 }
 
 // Обратная совместимость: старое имя (панель после запуска GTA).
@@ -660,6 +695,44 @@ ipcMain.handle('gta-agent-stop', () => {
   return { ok: true }
 })
 
+ipcMain.handle('gta-get-username', async () => {
+  const username = await getTikTokUsername()
+  return { username, agentRunning: gtaState.agentRunning, streamLive: !!gtaAgent?.streamLive }
+})
+
+// ─── Подключение эфира ИЗ ПАНЕЛИ (ник → комната → агент) ───
+// Аналог «Подключить стрим» из дашборда, но для мода: агент сам поднимет /streamer
+// (open_room + start_tiktok) и /viewer (join_room). Токен берём свежий с сервера.
+ipcMain.handle('gta-connect-stream', async (_e, { username, gamePath }: { username?: string; gamePath?: string }) => {
+  const token = tokenStore.getToken()
+  if (!token) { await showGtaModal('auth'); return { ok: false, reason: 'auth' } }
+  try {
+    const res = await axios.get(`${WEB_URL}/api/auth/verify-subscription`, {
+      headers: { Authorization: `Bearer ${token}` }, timeout: 15000,
+    })
+    if (!(res.data?.valid && res.data?.plan === 'pro')) {
+      await showGtaModal('sub'); return { ok: false, reason: 'subscription' }
+    }
+    const room = String(username || (await getTikTokUsername()) || '').replace('@', '').trim().toLowerCase()
+    if (!room) return { ok: false, reason: 'no_username' }
+
+    // Проверяем мод и GTA
+    const gp = gamePath || gtaState.gamePath
+    if (!gp || !findGtaInDir(gp)) return { ok: false, reason: 'gta-missing' }
+    const modOk = fs.existsSync(path.join(gp, 'scripts', 'MazLiveKOTH.dll'))
+    if (!modOk) return { ok: false, reason: 'mod-missing' }
+
+    await startAgent(gp, room, res.data.roomToken, { name: room })
+    // запомним ник, чтобы карточка/панель знали комнату
+    try { await session.defaultSession.cookies.set({ url: WEB_URL, name: 'tiktok_username', value: room, path: '/' }) } catch {}
+    return { ok: true, room }
+  } catch (err: any) {
+    if (err?.response?.status === 401) { tokenStore.clear(); await showGtaModal('auth'); return { ok: false, reason: 'auth' } }
+    if (err?.response?.status === 403) { await showGtaModal('sub'); return { ok: false, reason: 'subscription' } }
+    return { ok: false, reason: 'error', error: 'Ошибка подключения к серверу' }
+  }
+})
+
 // ─── Открытие локальной панели GTA без установленной игры ───
 // Мод доступен только по общей PRO-подписке (как остальные игры MAZLIVE).
 // Проверяем подписку на сервере ДО открытия панели; при отказе — нативный диалог.
@@ -676,8 +749,12 @@ ipcMain.handle('gta-open-panel', async () => {
       timeout: 15000,
     })
     if (res.data?.valid && res.data?.plan === 'pro') {
-      openGtaPanelWindow(gtaState.gamePath, '')
-      return { ok: true, gamePath: gtaState.gamePath }
+      // Ник TikTok (введён в дашборде) = комната эфира. Как у всех игр.
+      const username = await getTikTokUsername()
+      const roomToken = res.data?.roomToken || ''
+      // Панель сразу с полным набором: комната + токен (панель сама поднимет /streamer).
+      openGtaPanelWindow(gtaState.gamePath, username, roomToken)
+      return { ok: true, gamePath: gtaState.gamePath, room: username, hasStream: !!username }
     }
     await showGtaModal('sub')
     return { ok: false, reason: 'subscription', plan: res.data?.plan || 'free' }

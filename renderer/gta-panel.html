@@ -160,11 +160,15 @@
     </div>
 
     <div class="card">
-      <h2>Управление эфиром (стример)</h2>
+      <h2>Эфир (TikTok)</h2>
+      <div class="inline" style="margin-bottom:8px">
+        <div class="field" style="flex:1"><label class="label">Твой ник TikTok</label><input id="streamUser" type="text" placeholder="например: artem_live"/></div>
+      </div>
       <div class="grid" style="grid-template-columns:1fr 1fr">
-        <button class="primary" id="bRun">▶ Запустить GTA + эфир</button>
+        <button class="primary" id="bConnect">🔴 Подключить эфир</button>
         <button id="bStopAll">⏹ Остановить</button>
       </div>
+      <div class="small" style="margin-top:8px">Подписки/подарки/лайки заходят в игру автоматически. Комната = твой ник (тот же, что в дашборде).</div>
     </div>
 
     <div class="card">
@@ -464,11 +468,25 @@
   async function install(){ try{ log('установка мода…'); await api.installMod(gamePath||undefined); setModState(true); log('мод установлен ✓'); await api.applyCourse(gamePath); }catch(e){ log('ошибка установки: '+e.message); showSetup('Не удалось установить мод: '+e.message, 'err') } }
   async function uninstall(){ try{ log('удаление мода…'); await api.uninstallMod(gamePath||undefined); setModState(false); log('мод удалён') }catch(e){ log('ошибка удаления: '+e.message) } }
 
-  // Управление эфиром/раундом
-  async function run(){ log('запуск GTA и эфира…'); try{ if(roomId){ await api.launchGame ? null : null } }catch(e){}
-    // Запуск GTA+агент делает main через gta-run; здесь — через launch-game маршрут уже отработал при входе из каталога.
-    log('для запуска GTA используйте каталог (карточка → Запустить). Панель остаётся открытой.') }
-  async function stopAll(){ try{ await api.stopAgent(); log('агент остановлен') }catch(e){ log('stop: '+e.message) } }
+  // Подключение эфира: ник → комната → агент (как «Подключить стрим» в дашборде)
+  async function connectStream(){
+    const nick = ($('streamUser').value || '').trim().replace('@','').toLowerCase()
+    if(!nick){ log('укажи ник TikTok'); return }
+    log('подключаем эфир @'+nick+'…')
+    $('bConnect').disabled = true
+    try{
+      const r = await api.connectStream(nick, gamePath||undefined)
+      if(r && r.ok){ log('эфир подключён: комната @'+r.room+' ✓') }
+      else if(r && r.reason==='no_username') log('укажи ник TikTok')
+      else if(r && r.reason==='gta-missing') log('GTA не найдена — выбери папку игры')
+      else if(r && r.reason==='mod-missing') log('мод не установлен — нажми «Установить мод»')
+      else if(r && r.reason==='subscription') log('нужна подписка PRO')
+      else if(r && r.reason==='auth') log('нужно войти в аккаунт')
+      else log('не удалось подключить эфир'+(r&&r.error?(' — '+r.error):''))
+    }catch(e){ log('ошибка подключения: '+e.message) }
+    finally { $('bConnect').disabled = false; refresh() }
+  }
+  async function stopAll(){ try{ await api.stopAgent(); log('эфир остановлен') }catch(e){ log('stop: '+e.message) } }
   const ctrl=(action)=>api.command(action,1).then(()=>log('команда: '+action)).catch(e=>log('ошибка: '+e.message))
   async function testAction(){ try{ const a=$('testAction').value, n=Number($('testCount').value)||1; await api.command(a,n); log('тест: '+actionLabel(a)+' ×'+n) }catch(e){ log('тест: ошибка — '+e.message) } }
 
@@ -505,7 +523,7 @@
   $('bPick').onclick = pick
   $('bInstall').onclick = install
   $('bUninstall').onclick = uninstall
-  $('bRun').onclick = run
+  $('bConnect').onclick = connectStream
   $('bStopAll').onclick = stopAll
   $('cStart').onclick = ()=>ctrl('start'); $('cStop').onclick = ()=>ctrl('stop')
   $('cClear').onclick = ()=>ctrl('clear'); $('cReset').onclick = ()=>ctrl('reset')
@@ -526,6 +544,8 @@
 
   ;(async()=>{
     if(roomId){ $('setup').classList.add('hidden'); $('main').classList.remove('hidden') }
+    // Ник: из query (roomId) или сохранённый в приложении
+    try{ if(roomId) $('streamUser').value = roomId; else { const u = await api.getUsername(); if(u&&u.username) $('streamUser').value = u.username } }catch(e){}
     await loadSettings()
     await refreshSetup()
     setInterval(refresh, 1000); refresh()

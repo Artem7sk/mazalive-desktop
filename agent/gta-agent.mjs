@@ -3,8 +3,9 @@
  *
  * Работает ВНУТРИ Electron main-процесса (в узком preload/IPC-API, без отдельного HTTP-сервера).
  * Задачи:
- *  - подключиться к game-server через Socket.IO (namespace /viewer, событие join_room) —
- *    как ОБЫЧНАЯ игра, БЕЗ второго TikTok-моста;
+ *  - подключиться к game-server через Socket.IO: /streamer (open_room + start_tiktok —
+ *    поднимает комнату и TikTok-мост, как дашборд у обычных игр) и /viewer (join_room —
+ *    подписка на события tiktok_reaction);
  *  - слушать tiktok_reaction;
  *  - через rules.Router превращать события в действия;
  *  - отправлять действия в мод через bridge.ModBridge (файловый протокол v2);
@@ -37,7 +38,8 @@ export class GtaAgent extends EventEmitter {
     this.router = new Router(deps.rulesConfig || defaults);
 
     // runtime-состояние
-    this.socket = null;           // socket.io клиент (создаётся при connect)
+    this.socket = null;           // socket.io клиент /viewer (создаётся при connect)
+    this.streamerSocket = null;   // socket.io клиент /streamer (поднимает комнату+мост)
     this.token = null;            // JWT — ТОЛЬКО в памяти
     this.room = null;
     this.nickname = null;
@@ -63,10 +65,42 @@ export class GtaAgent extends EventEmitter {
     this.token = token; // только память
     this.nickname = nickname || this.room;
     if (gameSlug) this.gameSlug = gameSlug;
+    // База сервера без namespace (например https://games.mazlive.com)
+    const base = (serverUrl || 'https://games.mazlive.com/viewer').replace(/\/(viewer|streamer)\/?$/, '');
 
     const io = this.deps.loadSocketIo();
-    const url = serverUrl || 'https://games.mazlive.com/viewer';
-    this.socket = io(url, {
+
+    // ─── 1) /streamer: поднимаем комнату и TikTok-мост (как дашборд у обычных игр) ───
+    // Именно это делает эфир «живым»; без него /viewer.join_room бесполезен.
+    try {
+      this.streamerSocket = io(base + '/streamer', {
+        path: '/socket.io',
+        transports: ['websocket'],
+        auth: { token },
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 10000,
+        timeout: 15000,
+      });
+      this.streamerSocket.on('connect', () => {
+        this.streamerSocket.emit('open_room', { roomId: this.room, gameSlug: this.gameSlug });
+        this.streamerSocket.emit('start_tiktok', { username: this.room });
+        this._emitStatus('stream_connecting', 'Подключаем эфир…');
+      });
+      this.streamerSocket.on('stream_status', (d) => {
+        if (!d) return;
+        if (d.status === 'connected') { this.streamLive = true; this._emitStatus('stream_live', d.message || 'Эфир активен'); }
+        else if (d.status === 'connecting') { this._emitStatus('stream_connecting', 'Подключение к TikTok…'); }
+        else if (d.status === 'ended') { this.streamLive = false; this._emitStatus('waiting', 'Стрим завершён'); }
+        else if (d.status === 'stopped') { this.streamLive = false; this._emitStatus('waiting', d.message || 'Эфир остановлен'); }
+      });
+      this.streamerSocket.on('connect_error', (err) => this._emitStatus('error', 'Ошибка эфира: ' + (err && err.message || 'unknown')));
+    } catch (e) {
+      this._emitStatus('error', 'Не удалось поднять эфир: ' + (e && e.message));
+    }
+
+    // ─── 2) /viewer: подписка на события (tiktok_reaction) ───
+    this.socket = io(base + '/viewer', {
       path: '/socket.io',
       transports: ['websocket'],
       auth: { token, room: this.room },       // /viewer теперь не требует, но передаём для совместимости
@@ -102,6 +136,12 @@ export class GtaAgent extends EventEmitter {
   /** Отключиться от game-server и забыть токен. */
   disconnect() {
     this._stopPoller();
+    if (this._refreshTimer) { clearInterval(this._refreshTimer); this._refreshTimer = null; }
+    if (this.streamerSocket) {
+      try { this.streamerSocket.emit('stop_tiktok'); } catch {}
+      try { this.streamerSocket.removeAllListeners(); this.streamerSocket.disconnect(); } catch {}
+      this.streamerSocket = null;
+    }
     if (this.socket) {
       try { this.socket.removeAllListeners(); this.socket.disconnect(); } catch {}
       this.socket = null;
@@ -110,6 +150,21 @@ export class GtaAgent extends EventEmitter {
     this.streamLive = false;
     this.token = null;         // стираем из памяти
     this._resetPending('disconnect');
+  }
+
+  /**
+   * Обновить JWT (живёт 15 мин) и переподключить /streamer-соединение.
+   * Вызывается main-процессом по таймеру (~каждые 12 мин), токен держим только в памяти.
+   */
+  refreshToken(newToken) {
+    if (!newToken) return;
+    this.token = newToken;
+    if (this.streamerSocket) {
+      try {
+        this.streamerSocket.auth = { token: newToken };
+        this.streamerSocket.disconnect().connect();
+      } catch {}
+    }
   }
 
   // ─────────────────────── обработка событий ───────────────────────

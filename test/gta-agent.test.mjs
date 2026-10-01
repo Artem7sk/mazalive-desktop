@@ -29,11 +29,14 @@ function makeAgent(t, opts = {}) {
     gamePath: dir,
     deps: {
       // loadSocketIo() должен вернуть io-ФАБРИКУ (io(url, opts) → socket)
-      loadSocketIo: () => function fakeIo() { const s = new FakeSocket(); sockets.push(s); return s; },
+      loadSocketIo: () => function fakeIo(url) { const s = new FakeSocket(); s.url = url; sockets.push(s); return s; },
       rulesConfig: opts.rulesConfig,
     },
   });
-  return { agent, sockets, dir, root, state };
+  // viewer-сокет = тот, что /viewer (именно он ловит события и join_room)
+  const viewer = () => sockets.find(s => String(s.url).endsWith('/viewer'));
+  const streamer = () => sockets.find(s => String(s.url).endsWith('/streamer'));
+  return { agent, sockets, viewer, streamer, dir, root, state };
 }
 
 function inboxCount(root) {
@@ -41,10 +44,10 @@ function inboxCount(root) {
 }
 
 test('connect emits join_room with room/nickname/gameSlug', async t => {
-  const { agent, sockets } = makeAgent(t);
+  const { agent, viewer, sockets } = makeAgent(t);
   await agent.connect({ room: 'msk001', token: 'JWT', nickname: 'Artem' });
-  assert.equal(sockets.length, 1);
-  const s = sockets[0];
+  assert.equal(sockets.length, 2, "streamer + viewer");
+  const s = viewer();
   s.emit('connect');
   const join = s.emitted.find(e => e[0] === 'join_room');
   assert.ok(join);
@@ -54,43 +57,43 @@ test('connect emits join_room with room/nickname/gameSlug', async t => {
 });
 
 test('tiktok_reaction gift → command written to mod inbox, dedup on repeat', async t => {
-  const { agent, sockets, root } = makeAgent(t);
+  const { agent, viewer, sockets, root } = makeAgent(t);
   await agent.connect({ room: 'r', token: 'JWT' });
-  sockets[0].emit('connect');
-  sockets[0].emit('room_joined', { isStreamerConnected: true });
+  viewer().emit('connect');
+  viewer().emit('room_joined', { isStreamerConnected: true });
 
   const evt = { type: 'gift', giftType: 2, user: 'v1', nickname: 'V1', giftName: 'Rose', giftId: '5655', giftValue: 1, repeatCount: 2, timestamp: 1000 };
-  sockets[0].emit('tiktok_reaction', evt);
+  viewer().emit('tiktok_reaction', evt);
   assert.equal(inboxCount(root), 1, 'одна команда записана');
   assert.equal(agent.stats.dispatched, 1);
   // повтор того же события — дедуп
-  sockets[0].emit('tiktok_reaction', evt);
+  viewer().emit('tiktok_reaction', evt);
   assert.equal(inboxCount(root), 1, 'дубль не создаёт новую команду');
   assert.equal(agent.stats.dispatched, 1, 'дубль не отправлен повторно');
   assert.equal(agent.stats.received, 2);
 });
 
 test('pending queue never exceeds MAX_PENDING_ACKS (no ACKs)', async t => {
-  const { agent, sockets, root } = makeAgent(t);
+  const { agent, viewer, sockets, root } = makeAgent(t);
   await agent.connect({ room: 'r', token: 'JWT' });
-  sockets[0].emit('connect');
-  sockets[0].emit('room_joined', { isStreamerConnected: true });
+  viewer().emit('connect');
+  viewer().emit('room_joined', { isStreamerConnected: true });
   // шлём 150 уникальных событий → мод ставит максимум 100 .cmd (bridge сам режет),
   // агент держит не больше MAX_PENDING_ACKS ожидающих.
   for (let i = 0; i < 150; i++) {
-    sockets[0].emit('tiktok_reaction', { type: 'gift', giftType: 2, user: 'u' + i, nickname: 'U', giftName: 'Rose', giftId: '5655', giftValue: 1, repeatCount: 1, timestamp: 2000 + i });
+    viewer().emit('tiktok_reaction', { type: 'gift', giftType: 2, user: 'u' + i, nickname: 'U', giftName: 'Rose', giftId: '5655', giftValue: 1, repeatCount: 1, timestamp: 2000 + i });
   }
   assert.ok(agent.pending.length <= 100, `pending=${agent.pending.length} <= 100`);
 });
 
 test('stream_stopped resets pending queue', async t => {
-  const { agent, sockets } = makeAgent(t);
+  const { agent, viewer, sockets } = makeAgent(t);
   await agent.connect({ room: 'r', token: 'JWT' });
-  sockets[0].emit('connect');
-  sockets[0].emit('room_joined', { isStreamerConnected: true });
-  sockets[0].emit('tiktok_reaction', { type: 'gift', giftType: 2, user: 'u', nickname: 'U', giftName: 'Rose', giftId: '5655', giftValue: 5, repeatCount: 1, timestamp: 3000 });
+  viewer().emit('connect');
+  viewer().emit('room_joined', { isStreamerConnected: true });
+  viewer().emit('tiktok_reaction', { type: 'gift', giftType: 2, user: 'u', nickname: 'U', giftName: 'Rose', giftId: '5655', giftValue: 5, repeatCount: 1, timestamp: 3000 });
   assert.ok(agent.pending.length >= 1);
-  sockets[0].emit('stream_stopped', { reason: 'stopped_by_streamer' });
+  viewer().emit('stream_stopped', { reason: 'stopped_by_streamer' });
   assert.equal(agent.pending.length, 0);
   assert.equal(agent.streamLive, false);
 });
@@ -104,23 +107,23 @@ test('disconnect clears token from memory', async t => {
 });
 
 test('command not dispatched when mod round is not running', async t => {
-  const { agent, sockets, root } = makeAgent(t);
+  const { agent, viewer, sockets, root } = makeAgent(t);
   // меняем phase на idle
   const statusFile = path.join(root, 'status.json');
   fs.writeFileSync(statusFile, JSON.stringify({ protocol: 2, session: 'b'.repeat(32), updatedAt: Date.now(), phase: 'idle', version: 'x' }));
   await agent.connect({ room: 'r', token: 'JWT' });
-  sockets[0].emit('connect');
-  sockets[0].emit('room_joined', { isStreamerConnected: true });
-  sockets[0].emit('tiktok_reaction', { type: 'gift', giftType: 2, user: 'u', nickname: 'U', giftName: 'Rose', giftId: '5655', giftValue: 1, repeatCount: 1, timestamp: 4000 });
+  viewer().emit('connect');
+  viewer().emit('room_joined', { isStreamerConnected: true });
+  viewer().emit('tiktok_reaction', { type: 'gift', giftType: 2, user: 'u', nickname: 'U', giftName: 'Rose', giftId: '5655', giftValue: 1, repeatCount: 1, timestamp: 4000 });
   assert.equal(inboxCount(root), 0, 'команда не ушла, т.к. раунд не идёт');
 });
 
 test('ACK consumption: queued vs rejected reflected in stats', async t => {
-  const { agent, sockets, root } = makeAgent(t);
+  const { agent, viewer, sockets, root } = makeAgent(t);
   await agent.connect({ room: 'r', token: 'JWT' });
-  sockets[0].emit('connect');
-  sockets[0].emit('room_joined', { isStreamerConnected: true });
-  sockets[0].emit('tiktok_reaction', { type: 'gift', giftType: 2, user: 'u', nickname: 'U', giftName: 'Rose', giftId: '5655', giftValue: 1, repeatCount: 1, timestamp: 5000 });
+  viewer().emit('connect');
+  viewer().emit('room_joined', { isStreamerConnected: true });
+  viewer().emit('tiktok_reaction', { type: 'gift', giftType: 2, user: 'u', nickname: 'U', giftName: 'Rose', giftId: '5655', giftValue: 1, repeatCount: 1, timestamp: 5000 });
   assert.equal(agent.pending.length, 1);
   const ticket = agent.pending[0].ticket;
   // пишем ACK
