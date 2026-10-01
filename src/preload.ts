@@ -28,6 +28,7 @@ contextBridge.exposeInMainWorld('mazalive', {
     uninstallMod: (gamePath?: string) => ipcRenderer.invoke('gta-uninstall-mod', { gamePath }),
     state: () => ipcRenderer.invoke('gta-state'),
     command: (action: string, count = 1) => ipcRenderer.invoke('gta-agent-command', { action, count }),
+    testEvent: (evt: any) => ipcRenderer.invoke('gta-test-event', { evt }),
     stopAgent: () => ipcRenderer.invoke('gta-agent-stop'),
     connectStream: (username?: string, gamePath?: string) => ipcRenderer.invoke('gta-connect-stream', { username, gamePath }),
     getUsername: () => ipcRenderer.invoke('gta-get-username'),

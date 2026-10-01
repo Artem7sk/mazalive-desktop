@@ -683,6 +683,11 @@ ipcMain.handle('gta-agent-command', (_event, { action, count = 1 }: { action: st
   return gtaAgent.control(action, { count, name: 'Streamer' })
 })
 
+ipcMain.handle('gta-test-event', (_event, { evt }: { evt: any }) => {
+  if (!gtaAgent) throw new Error('Агент не запущен — сначала «Подключить эфир»')
+  return gtaAgent.simulate(evt)
+})
+
 ipcMain.handle('gta-agent-stop', () => {
   if (gtaAgent) { gtaAgent.disconnect(); gtaAgent = null }
   gtaState.agentRunning = false

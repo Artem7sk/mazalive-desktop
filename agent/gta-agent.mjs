@@ -188,6 +188,39 @@ export class GtaAgent extends EventEmitter {
     }
   }
 
+  /**
+   * Тестовое событие зрителя (без реального TikTok-эфира).
+   * Прогоняет событие через те же правила (router.accept) и отправляет команды в мод.
+   * @param {{type:'gift'|'like'|'follow', user?:string|object, nickname?:string, giftId?:string, giftName?:string,
+   *          giftValue?:number, repeatCount?:number, likeCount?:number, avatar?:string, test?:boolean}} evt
+   */
+  simulate(evt) {
+    if (!evt || typeof evt !== 'object') return { ok: false, error: 'Пустое событие' };
+    const type = String(evt.type || '');
+    if (!['gift', 'like', 'follow'].includes(type)) return { ok: false, error: 'Неизвестный тип: ' + type };
+    // Обогащаем: уникальный user, timestamp, тестовая метка.
+    const uid = String(evt.user || ('test_viewer_' + Math.floor(Math.random() * 1000)));
+    const nickname = String(evt.nickname || ('Тест_' + uid));
+    const payload = {
+      type,
+      user: { uniqueId: uid, userId: uid, nickname },
+      user_id: uid,
+      nickname,
+      avatar: evt.avatar || '',
+      giftId: evt.giftId,
+      giftName: evt.giftName,
+      giftValue: Number(evt.giftValue) || 1,
+      repeatCount: Math.max(1, Number(evt.repeatCount) || 1),
+      likeCount: Math.max(1, Number(evt.likeCount) || 1),
+      firstTime: true,
+      timestamp: Date.now(),
+      test: true,
+    };
+    this._emitStatus('test', `🧪 Тест: ${type} от @${uid}` + (type === 'gift' ? ` (${payload.giftValue}×${payload.repeatCount})` : ''));
+    this._onReaction(payload);
+    return { ok: true, accepted: true, type, uid };
+  }
+
   _dispatch(item) {
     // Ограничение очереди ожидающих ACK
     if (this.pending.length >= MAX_PENDING_ACKS) {

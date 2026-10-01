@@ -133,3 +133,23 @@ test('ACK consumption: queued vs rejected reflected in stats', async t => {
   assert.equal(agent.pending.length, 0);
   assert.equal(agent.stats.acked, 1);
 });
+
+test('simulate() feeds a synthetic gift through rules and dispatches', async t => {
+  const { agent, viewer, root } = makeAgent(t);
+  await agent.connect({ room: 'r', token: 'JWT' });
+  viewer().emit('connect');
+  viewer().emit('room_joined', { isStreamerConnected: true });
+  const r = agent.simulate({ type: 'gift', user: 'tester1', nickname: 'Tester', giftId: '5655', giftName: 'Rose', giftValue: 10, repeatCount: 1 });
+  assert.equal(r.ok, true);
+  assert.equal(r.type, 'gift');
+  assert.equal(agent.stats.received, 1, 'событие прошло через ту же обработку');
+  assert.equal(agent.pending.length, 1, 'команда поставлена в очередь мода');
+});
+
+test('simulate() rejects unknown type', async t => {
+  const { agent } = makeAgent(t);
+  await agent.connect({ room: 'r', token: 'JWT' });
+  const r = agent.simulate({ type: 'nope' });
+  assert.equal(r.ok, false);
+  assert.match(r.error, /Неизвестный тип/);
+});

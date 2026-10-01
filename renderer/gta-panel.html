@@ -190,7 +190,33 @@
         <button id="cReset">↺ Сброс</button>
       </div>
       <hr/>
-      <div class="label" style="margin-bottom:6px">Тестовое действие зрителя (проверка правил/реакций)</div>
+      <div class="label" style="margin-bottom:6px">🧪 Тест зрителя — имитация событий (без эфира)</div>
+      <div class="small" style="margin-bottom:8px;color:var(--muted)">Проверяет правила как будто пришёл подарок/лайк/подписка. Работает после «Подключить эфир».</div>
+      <div class="grid" style="grid-template-columns:1fr 1fr">
+        <button id="tGift">🎁 Подарок</button>
+        <button id="tLike">❤️ Лайки</button>
+        <button id="tFollow">👤 Подписка</button>
+        <button id="tRandom">🎲 Случайный зритель</button>
+      </div>
+      <div class="inline" style="margin-top:8px">
+        <div class="field">
+          <label class="label">Ник зрителя (тест)</label>
+          <input id="testUser" placeholder="например test_viewer" value="test_viewer"/>
+        </div>
+        <div class="field" style="max-width:110px">
+          <label class="label">Монет/лайков</label>
+          <input id="testValue" type="number" min="1" value="1"/>
+        </div>
+      </div>
+      <div class="inline" style="margin-top:6px">
+        <div class="field">
+          <label class="label">Подарок (для 🎁)</label>
+          <select id="testGift"></select>
+        </div>
+        <button id="tGiftSend">▶ Отправить подарок</button>
+      </div>
+      <hr/>
+      <div class="label" style="margin-bottom:6px">Прямая команда моду (отладка)</div>
       <div class="inline">
         <div class="field">
           <select id="testAction">
@@ -393,6 +419,7 @@
       try{ const r = await api.giftsCatalog(); GIFT_CATALOG = (r && r.gifts) || [] }catch(e){ log('каталог подарков: '+e.message) }
     }
     renderPicker()
+    fillTestGifts()
     $('gpQuery').focus()
   }
 
@@ -411,6 +438,10 @@
     $('cAngle').value = s.course.angle
     $('cSeg').value = s.course.segments
     $('cSec').value = s.course.roundSeconds
+    // Предзагрузка каталога подарков для теста зрителя (если ещё не загружен).
+    if(!GIFT_CATALOG.length && api && api.giftsCatalog){
+      api.giftsCatalog().then(r=>{ GIFT_CATALOG = (r && r.gifts) || []; fillTestGifts() }).catch(()=>fillTestGifts())
+    } else if(GIFT_CATALOG.length){ fillTestGifts() }
   }
 
   function getSettingsPayload(){
@@ -500,6 +531,35 @@
   const ctrl=(action)=>api.command(action,1).then(()=>log('команда: '+action)).catch(e=>log('ошибка: '+e.message))
   async function testAction(){ try{ const a=$('testAction').value, n=Number($('testCount').value)||1; await api.command(a,n); log('тест: '+actionLabel(a)+' ×'+n) }catch(e){ log('тест: ошибка — '+e.message) } }
 
+  // ─── Тест зрителя: имитация событий TikTok (без эфира) ───
+  function fillTestGifts(){
+    const sel = $('testGift'); if(!sel) return
+    const pop = (GIFT_CATALOG||[]).slice(0,300)
+    sel.innerHTML = ''
+    if(!pop.length){ sel.appendChild(new Option('🎁 Общий подарок (без ID)', '')); return }
+    for(const g of pop) sel.appendChild(new Option(`🎁 ${g.name||'?'} · 💎${g.coins??g.diamond_count??'?'}`, String(g.id)))
+  }
+  function testVal(){ return Math.max(1, Number($('testValue').value)||1) }
+  function testUser(){ return ($('testUser').value||'').trim() || 'test_viewer' }
+  async function sendTest(evt){
+    if(!api) return
+    try{ const r = await api.testEvent(evt); log('🧪 тест '+evt.type+': '+(r&&r.ok?'отправлено в правила':'?')) }
+    catch(e){ log('🧪 тест ошибка — '+e.message) }
+  }
+  function sendTestGift(){
+    const sel = $('testGift'); const id = sel ? sel.value : ''
+    const g = (GIFT_CATALOG||[]).find(x=>String(x.id)===String(id)) || {}
+    sendTest({ type:'gift', user:testUser(), nickname:testUser(), giftId:id, giftName:g.name||'Тестовый подарок', giftValue:testVal(), repeatCount:1 })
+  }
+  function sendTestLike(){ sendTest({ type:'like', user:testUser(), nickname:testUser(), likeCount:testVal() }) }
+  function sendTestFollow(){ sendTest({ type:'follow', user:testUser(), nickname:testUser(), firstTime:true }) }
+  function sendTestRandom(){
+    const uid = 'viewer_'+Math.floor(Math.random()*9000+1000)
+    const nm = 'Зритель'+Math.floor(Math.random()*100)
+    $('testUser').value = uid
+    sendTest({ type:'gift', user:uid, nickname:nm, giftId:'', giftName:'Случайный подарок', giftValue:Math.floor(Math.random()*90+10), repeatCount:1 })
+  }
+
   async function saveSettings(){ const res = await api.settingsSet(getSettingsPayload()); await loadSettings(); log('настройки сохранены ✓'+(res.applied?(' · ini: '+res.applied):'')) }
   async function applyCourse(){ const res = await api.applyCourse(gamePath||undefined); if(res.ok) log('курс применён к моду: '+res.applied); else log('курс не применён (мод не установлен?)') }
   async function resetSettings(){ await api.settingsReset(); await loadSettings(); log('настройки сброшены к дефолту') }
@@ -539,6 +599,11 @@
   $('cStart').onclick = ()=>ctrl('start'); $('cStop').onclick = ()=>ctrl('stop')
   $('cClear').onclick = ()=>ctrl('clear'); $('cReset').onclick = ()=>ctrl('reset')
   $('bTest').onclick = testAction
+  $('tGiftSend').onclick = sendTestGift
+  $('tGift').onclick = sendTestGift
+  $('tLike').onclick = sendTestLike
+  $('tFollow').onclick = sendTestFollow
+  $('tRandom').onclick = sendTestRandom
   $('bSave').onclick = saveSettings
   $('bApply').onclick = applyCourse
   $('bResetSet').onclick = resetSettings
