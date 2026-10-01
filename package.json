@@ -6,7 +6,7 @@
   "scripts": {
     "build": "tsc",
     "start": "electron .",
-    "test": "node --test \"test/*.test.mjs\"",
+    "test": "node --test test/bridge.test.mjs test/rules.test.mjs test/gta-agent.test.mjs",
     "dist": "npm run build && electron-builder",
     "build-win": "npm run build && electron-builder --win",
     "build-mac": "npm run build && electron-builder --mac"
