@@ -36,6 +36,7 @@ contextBridge.exposeInMainWorld('mazalive', {
     settingsSet: (settings: any) => ipcRenderer.invoke('gta-settings-set', { settings }),
     settingsReset: () => ipcRenderer.invoke('gta-settings-reset'),
     applyCourse: (gamePath?: string) => ipcRenderer.invoke('gta-apply-course', { gamePath }),
+    giftsCatalog: () => ipcRenderer.invoke('gta-gifts-catalog'),
 
     onRequired: (cb: (data: any) => void) => ipcRenderer.on('gta-required', (_e, d) => cb(d)),
     onStatus: (cb: (data: any) => void) => ipcRenderer.on('gta-status', (_e, d) => cb(d)),

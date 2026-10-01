@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:;"/>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://mazlive.com;"/>
 <title>Mazlive — Панель GTA «Царь горы»</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
@@ -58,6 +58,42 @@
   .rule button{padding:6px 9px}
   .small{font-size:11px;color:var(--muted)}
   hr{border:none;border-top:1px solid var(--border);margin:10px 0}
+  /* ── Правила подарков (список с иконками) ── */
+  .gift-rule{display:flex;align-items:center;gap:10px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:8px 10px;margin-bottom:6px}
+  .gift-rule img,.gift-rule .gp-emoji{width:34px;height:34px;border-radius:8px;object-fit:contain;background:#0a0d13;flex:0 0 auto}
+  .gift-rule .gp-emoji{display:flex;align-items:center;justify-content:center;font-size:18px}
+  .gift-rule .g-body{flex:1;min-width:0}
+  .gift-rule .g-name{font-weight:700;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .gift-rule .g-meta{font-size:10px;color:var(--muted);margin-top:2px}
+  .gift-rule select{padding:5px 7px;font-size:11px;width:auto;min-width:96px}
+  .gift-rule input[type=number]{width:56px;padding:5px 7px;font-size:11px}
+  .gift-rule button{padding:5px 9px;font-size:11px}
+  .gift-empty{font-size:11px;color:var(--muted);padding:8px;text-align:center;border:1px dashed var(--border);border-radius:10px}
+  /* ── Диалог-пикер подарков ── */
+  dialog{padding:0;border:none;background:transparent}
+  dialog::backdrop{background:rgba(0,0,0,.7)}
+  .gp-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;width:min(880px,94vw);max-height:88vh;display:flex;flex-direction:column;overflow:hidden}
+  .gp-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border)}
+  .gp-head small{color:var(--muted);font-size:10px;letter-spacing:1px}
+  .gp-head h3{font-size:15px;margin-top:2px}
+  .gp-head button{background:transparent;border:none;font-size:16px;padding:4px 8px}
+  .gp-search{padding:12px 16px 6px}
+  .gp-filters{display:flex;gap:6px;padding:0 16px 10px;flex-wrap:wrap}
+  .gp-filters .fbtn{padding:5px 11px;font-size:11px;font-weight:600}
+  .gp-filters .fbtn.active{background:linear-gradient(135deg,var(--purple),var(--blue));border-color:transparent;color:#fff}
+  .gp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;padding:6px 16px 12px;overflow-y:auto;flex:1}
+  .gp-card{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:10px 6px;display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer;transition:.15s;text-align:center}
+  .gp-card:hover{border-color:var(--purple);background:#21293a;transform:translateY(-2px)}
+  .gp-card img,.gp-card .gp-emoji{width:44px;height:44px;object-fit:contain}
+  .gp-card .gp-emoji{display:flex;align-items:center;justify-content:center;font-size:26px}
+  .gp-card b{font-size:11px;font-weight:600;line-height:1.2;max-height:2.4em;overflow:hidden}
+  .gp-card small{font-size:10px;color:var(--cyan)}
+  .gp-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;border-top:1px solid var(--border);flex-wrap:wrap}
+  .gp-foot>span{font-size:11px;color:var(--muted)}
+  .gp-params{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .gp-params label{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:5px}
+  .gp-params input{width:64px;padding:5px 7px}
+  .gp-hint{font-size:10px;color:var(--muted)}
 </style>
 </head>
 <body>
@@ -168,9 +204,10 @@
       <div class="field"><label class="label">Монет на действие</label><input id="sCoins" type="number" min="1"/></div>
       <div class="field"><label class="label">Макс. за событие</label><input id="sMax" type="number" min="1" max="12"/></div>
     </div>
-    <div class="label" style="margin:10px 0 6px">Правила подарков</div>
-    <div id="rules"></div>
-    <button id="bAddRule" style="margin-top:4px">+ Добавить правило</button>
+    <div class="label" style="margin:12px 0 6px">Правила подарков</div>
+    <div class="small" style="margin-bottom:8px">Выбери подарок из каталога TikTok и задай, что он делает в GTA. Все остальные подарки работают по общему правилу («Монет на действие»).</div>
+    <button class="primary" id="bAddRule" style="width:100%">🎁 Выбрать подарок</button>
+    <div id="rules" style="margin-top:8px"></div>
   </div>
 
   <div class="card">
@@ -193,6 +230,35 @@
     <div class="log" id="log"></div>
   </div>
 
+  <!-- ДИАЛОГ: каталог подарков TikTok (как в других играх MAZLIVE) -->
+  <dialog id="giftPicker">
+    <div class="gp-box">
+      <div class="gp-head">
+        <div><small>КАТАЛОГ TIKTOK</small><h3>Выбор подарка</h3></div>
+        <button id="gpClose">✕</button>
+      </div>
+      <div class="gp-search">
+        <input id="gpQuery" placeholder="Поиск по названию, ID или цене…" autocomplete="off"/>
+      </div>
+      <div class="gp-filters" id="gpFilters">
+        <button class="fbtn active" data-min="0" data-max="999999999">Все</button>
+        <button class="fbtn" data-min="1" data-max="9">до 10</button>
+        <button class="fbtn" data-min="10" data-max="99">10–99</button>
+        <button class="fbtn" data-min="100" data-max="999">100–999</button>
+        <button class="fbtn" data-min="1000" data-max="999999999">1000+</button>
+      </div>
+      <div class="gp-grid" id="gpGrid"></div>
+      <div class="gp-foot">
+        <span id="gpCount">…</span>
+        <div class="gp-params">
+          <div class="gp-hint">👆 Укажите действие и кликните по подарку</div>
+          <label>⚙ Действие <select id="gpAction"></select></label>
+          <label>💎 Монет <input id="gpCoins" type="number" min="1" value="10"/></label>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
 <script>
   const q = new URLSearchParams(location.search)
   const api = window.mazalive && window.mazalive.gta
@@ -207,31 +273,94 @@
   function dot(el, cls){ if(el) el.className='dot '+cls }
 
   function fillActionSelects(){
-    const follow = $('sFollow'), def = $('sDefGift')
-    for(const a of actions){ follow.appendChild(new Option(a,a)); def.appendChild(new Option(a,a)) }
+    const follow = $('sFollow'), def = $('sDefGift'), gpa = $('gpAction')
+    for(const a of actions){ follow.appendChild(new Option(a,a)); def.appendChild(new Option(a,a)); gpa.appendChild(new Option(a,a)) }
+  }
+
+  // ─── Каталог подарков TikTok (пикер, как в других играх MAZLIVE) ───
+  let GIFT_CATALOG = []
+  let GP_MIN = 0, GP_MAX = 999999999
+  const gpEl = $('giftPicker')
+
+  // Иконка подарка: проксируем через /api/avatar (иначе CSP/tiktokcdn), fallback → эмодзи.
+  function giftIcon(g){
+    const prox = u => { try { return 'https://mazlive.com/api/avatar?url='+encodeURIComponent(u) } catch { return u } }
+    const img = document.createElement('img')
+    img.alt = g.name || ''; img.loading = 'lazy'
+    img.onerror = () => { const e=document.createElement('div'); e.className='gp-emoji'; e.textContent='🎁'; img.replaceWith(e) }
+    img.src = g.image_url ? prox(g.image_url) : ''
+    return img
   }
 
   function renderRules(rules){
     const box = $('rules'); box.innerHTML = ''
+    if(!rules.length){
+      const e=document.createElement('div'); e.className='gift-empty'
+      e.textContent='Пока нет особых правил — все подарки работают по общему правилу.'
+      box.appendChild(e); return
+    }
     rules.forEach((r, i) => {
-      const row = document.createElement('div'); row.className = 'rule'
-      row.innerHTML = `
-        <input data-k="name" placeholder="Название/ID подарка" value="${(r.name||'').replace(/"/g,'&quot;')}"/>
-        <input data-k="id" placeholder="giftId (опц.)" value="${(r.id||'').replace(/"/g,'&quot;')}"/>
-        <select data-k="action">${actions.map(a=>`<option ${a===r.action?'selected':''}>${a}</option>`).join('')}</select>
-        <input data-k="coinsPerAction" type="number" min="1" value="${r.coinsPerAction||1}"/>
-        <button class="danger" data-del="${i}">✕</button>`
+      const row = document.createElement('div'); row.className = 'gift-rule'
+      const icon = r.image_url || (GIFT_CATALOG.find(g=>String(g.id)===String(r.id))||{}).image_url
+      if(icon) row.appendChild(giftIcon({ image_url: icon, name: r.name }))
+      else { const e=document.createElement('div'); e.className='gp-emoji'; e.textContent='🎁'; row.appendChild(e) }
+      const body = document.createElement('div'); body.className='g-body'
+      const nm = document.createElement('div'); nm.className='g-name'; nm.textContent = r.name || ('ID '+r.id)
+      const meta = document.createElement('div'); meta.className='g-meta'; meta.textContent = r.coins ? ('💎 '+r.coins+' монет') : ''
+      body.append(nm, meta); row.appendChild(body)
+      row.dataset.name = r.name || ''
+      const sel = document.createElement('select'); sel.dataset.k='action'
+      for(const a of actions) sel.appendChild(new Option(a,a,false,a===r.action))
+      row.appendChild(sel)
+      const coins = document.createElement('input'); coins.type='number'; coins.min='1'; coins.dataset.k='coinsPerAction'; coins.value = r.coinsPerAction||1
+      row.appendChild(coins)
+      const del = document.createElement('button'); del.className='danger'; del.textContent='✕'
+      del.onclick=()=>{ const cur=collectRules(); cur.splice(i,1); renderRules(cur); courseDirty=true }
+      row.appendChild(del)
       box.appendChild(row)
-    })
-    box.querySelectorAll('button[data-del]').forEach(b=>b.onclick=()=>{
-      const cur = collectRules(); cur.splice(Number(b.dataset.del),1); renderRules(cur); courseDirty=true
     })
   }
   function collectRules(){
-    return [...$('rules').querySelectorAll('.rule')].map(row=>{
+    return [...$('rules').querySelectorAll('.gift-rule')].map(row=>{
       const g = k => row.querySelector(`[data-k="${k}"]`).value
-      return { name:g('name').trim(), id:(g('id')||'').trim()||undefined, action:g('action'), coinsPerAction:Number(g('coinsPerAction'))||1 }
-    }).filter(r=>r.name||r.id)
+      const name = row.dataset.name || ''
+      const found = GIFT_CATALOG.find(x=>x.name===name)
+      return { name, id: found?String(found.id):undefined, action:g('action'), coinsPerAction:Number(g('coinsPerAction'))||1 }
+    }).filter(r=>r.name)
+  }
+
+  function renderPicker(query = ''){
+    const q = query.trim().toLowerCase()
+    const list = GIFT_CATALOG.filter(g => g.coins >= GP_MIN && g.coins <= GP_MAX)
+      .filter(g => !q || (g.name||'').toLowerCase().includes(q) || String(g.id).includes(q) || String(g.coins).includes(q))
+    const shown = list.slice(0, 300)
+    const grid = $('gpGrid'); grid.innerHTML = ''
+    shown.forEach(g => {
+      const c = document.createElement('div'); c.className='gp-card'
+      c.appendChild(giftIcon(g))
+      const b = document.createElement('b'); b.textContent = g.name; c.appendChild(b)
+      const s = document.createElement('small'); s.textContent = '💎 '+g.coins; c.appendChild(s)
+      c.onclick = () => {
+        const action = $('gpAction').value
+        const coins = Math.max(1, Number($('gpCoins').value)||g.coins||1)
+        const cur = collectRules(); cur.push({ name:g.name, action, coinsPerAction:coins, image_url:g.image_url, id:g.id })
+        renderRules(cur); courseDirty = true
+        log('добавлено правило: «'+g.name+'» → '+action+' ×'+coins)
+      }
+      grid.appendChild(c)
+    })
+    $('gpCount').textContent = list.length ? ('Найдено: '+list.length+(list.length>300?' (первые 300)':'')) : 'Ничего не найдено'
+  }
+
+  async function openGiftPicker(){
+    if(!gpEl.open) gpEl.showModal()
+    $('gpQuery').value = ''
+    $('gpCount').textContent = 'Загружаем каталог…'
+    if(!GIFT_CATALOG.length && api && api.giftsCatalog){
+      try{ const r = await api.giftsCatalog(); GIFT_CATALOG = (r && r.gifts) || [] }catch(e){ log('каталог подарков: '+e.message) }
+    }
+    renderPicker()
+    $('gpQuery').focus()
   }
 
   async function loadSettings(){
@@ -365,7 +494,16 @@
   $('bSave').onclick = saveSettings
   $('bApply').onclick = applyCourse
   $('bResetSet').onclick = resetSettings
-  $('bAddRule').onclick = ()=>{ const cur=collectRules(); cur.push({name:'',action:actions[0]||'car',coinsPerAction:1}); renderRules(cur) }
+  $('bAddRule').onclick = openGiftPicker
+  // Пикер подарков: поиск, фильтры, закрытие
+  $('gpClose').onclick = ()=>gpEl.close()
+  $('gpQuery').oninput = e => renderPicker(e.target.value)
+  gpEl.addEventListener('click', e => { const r=gpEl.querySelector('.gp-box').getBoundingClientRect(); if(e.target===gpEl || e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom) gpEl.close() })
+  document.querySelectorAll('#gpFilters .fbtn').forEach(b => b.onclick = () => {
+    GP_MIN = Number(b.dataset.min)||0; GP_MAX = Number(b.dataset.max)||999999999
+    document.querySelectorAll('#gpFilters .fbtn').forEach(x => x.classList.toggle('active', x===b))
+    renderPicker($('gpQuery').value)
+  })
 
   ;(async()=>{
     if(roomId){ $('setup').classList.add('hidden'); $('main').classList.remove('hidden') }

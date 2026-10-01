@@ -660,6 +660,30 @@ ipcMain.handle('gta-select-dir', async () => {
   return { ok: true, gamePath: hit.gamePath, deps, modInstalled }
 })
 
+// ─── Каталог подарков TikTok (для выбора правила в панели GTA) ───
+// Грузим ТОТ ЖЕ каталог, что и остальные игры MAZLIVE: /data/gifts.json с прода.
+// Иконки рендер отдаёт через /api/avatar-прокси (как в других играх). Кэшируем в памяти.
+let giftsCache: { id: number; name: string; coins: number; image_url?: string }[] | null = null
+ipcMain.handle('gta-gifts-catalog', async () => {
+  if (giftsCache) return { ok: true, gifts: giftsCache }
+  try {
+    const cookies = await session.defaultSession.cookies.get({ url: WEB_URL })
+    const cookieHeader = cookies.map((c) => `${c.name}=${c.value}`).join('; ')
+    const res = await axios.get(`${WEB_URL}/data/gifts.json`, {
+      headers: { Cookie: cookieHeader },
+      timeout: 15000,
+    })
+    const data = res.data || {}
+    const list = (data.gifts || data || []).map((g: any) => ({
+      id: g.id, name: g.name, coins: g.coins, image_url: g.image_url,
+    }))
+    giftsCache = list
+    return { ok: true, gifts: list }
+  } catch (e: any) {
+    return { ok: false, error: e.message, gifts: [] }
+  }
+})
+
 // ─── Настройки GTA (реакции + раунд/трасса) ───
 ipcMain.handle('gta-settings-get', () => {
   return { ok: true, settings: gtaSettings.get(), actions: MOD_ACTIONS }
