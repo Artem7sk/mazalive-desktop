@@ -35,7 +35,7 @@ async function checkAsar() {
       : (await import('@electron/asar')).default;
     asar = src || (await import(require('url').pathToFileURL(asarMain).href));
   } catch (e) { fail('@electron/asar недоступен: ' + e.message); return; }
-  const files = asar.listPackage(asarPath);
+  const files = asar.listPackage(asarPath).map((f) => f.replace(/\\/g, '/'));
   for (const need of ['/dist/main.js', '/agent/load-agent.js', '/agent/gta-agent.mjs', '/agent/rules.mjs', '/agent/bridge.mjs']) {
     if (files.includes(need)) ok('asar содержит ' + need);
     else fail('asar НЕ содержит ' + need);
