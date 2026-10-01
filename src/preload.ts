@@ -18,4 +18,21 @@ contextBridge.exposeInMainWorld('mazalive', {
     ipcRenderer.on('update-progress', (_e, data) => cb(data)),
   onError: (cb: (data: { message: string }) => void) =>
     ipcRenderer.on('error', (_e, data) => cb(data)),
+
+  // ─── DESKTOP-GAME (GTA «Царь горы») — узкий API ───
+  gta: {
+    detect: () => ipcRenderer.invoke('gta-detect'),
+    checkPath: (gamePath: string) => ipcRenderer.invoke('gta-check-path', { gamePath }),
+    installMod: (gamePath?: string) => ipcRenderer.invoke('gta-install-mod', { gamePath }),
+    uninstallMod: (gamePath?: string) => ipcRenderer.invoke('gta-uninstall-mod', { gamePath }),
+    state: () => ipcRenderer.invoke('gta-state'),
+    command: (action: string, count = 1) => ipcRenderer.invoke('gta-agent-command', { action, count }),
+    stopAgent: () => ipcRenderer.invoke('gta-agent-stop'),
+
+    onRequired: (cb: (data: any) => void) => ipcRenderer.on('gta-required', (_e, d) => cb(d)),
+    onStatus: (cb: (data: any) => void) => ipcRenderer.on('gta-status', (_e, d) => cb(d)),
+    onAgentStatus: (cb: (data: any) => void) => ipcRenderer.on('gta-agent-status', (_e, d) => cb(d)),
+    onCommand: (cb: (data: any) => void) => ipcRenderer.on('gta-command', (_e, d) => cb(d)),
+    onAck: (cb: (data: any) => void) => ipcRenderer.on('gta-ack', (_e, d) => cb(d)),
+  },
 })

@@ -9,19 +9,60 @@ import {
   dialog,
 } from 'electron'
 import path from 'path'
+import fs from 'node:fs'
 import axios from 'axios'
 import { autoUpdater } from 'electron-updater'
 import { tokenStore } from './auth/tokenStore'
+import { isDesktopGame, requiresDesktopAgent } from './games/registry'
+import {
+  autoDetectGta,
+  findGtaInDir,
+  checkDependencies,
+  installMod,
+  uninstallMod,
+  launchGta,
+  isGtaRunning,
+} from './gta/gtaMod'
+// @ts-ignore — .mjs адаптер мода (переиспользуем как есть)
+import { GtaAgent } from '../agent/gta-agent.mjs'
 
 const APP_VERSION = app.getVersion()
 
 const WEB_URL = process.env.WEB_URL || 'https://mazlive.com'
 const GAME_SERVER_URL = process.env.GAME_SERVER_URL || 'https://games.mazlive.com'
+const GAME_SERVER_SOCKET_URL = process.env.GAME_SERVER_SOCKET_URL || 'https://games.mazlive.com/viewer'
 const DEV = process.env.NODE_ENV === 'development'
 
 let authWindow: BrowserWindow | null = null
 let mainWindow: BrowserWindow | null = null
 let gameWindow: BrowserWindow | null = null
+
+// ─── GTA desktop-game runtime ───
+let gtaAgent: GtaAgent | null = null
+let gtaState: {
+  gamePath: string | null
+  modInstalled: boolean
+  agentRunning: boolean
+  lastStatus: string
+  lastError: string | null
+} = { gamePath: null, modInstalled: false, agentRunning: false, lastStatus: 'idle', lastError: null }
+
+// Папка с упакованными ресурсами мода (в prod — resources/mod, в dev — ./mod)
+function modSourceDir(): string {
+  const packaged = path.join(process.resourcesPath || '', 'mod')
+  if (fs.existsSync(packaged)) return packaged
+  return path.join(__dirname, '..', 'mod')
+}
+
+// Динамическая загрузка socket.io-client (упакован в Electron, юзеру Node не нужен)
+function loadSocketIo() {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  return require('socket.io-client').io
+}
+
+function sendToMain(channel: string, payload?: any) {
+  mainWindow?.webContents.send(channel, payload)
+}
 
 // =============================================================
 // Регистрация deep link протокола mazalive://
@@ -226,7 +267,12 @@ async function verifyAndLaunchGame(gameSlug: string, roomId: string) {
     })
 
     if (res.data.valid && res.data.plan === 'pro') {
-      await createGameWindow(gameSlug, roomId, res.data.roomToken)
+      // ✅ Роутинг по типу игры (по умолчанию — web-game, обратная совместимость)
+      if (isDesktopGame(gameSlug)) {
+        await startDesktopGame(gameSlug, roomId, res.data.roomToken, res.data)
+      } else {
+        await createGameWindow(gameSlug, roomId, res.data.roomToken)
+      }
     } else {
       mainWindow?.webContents.send('subscription-required', {
         plan: res.data.plan || 'free',
@@ -242,6 +288,116 @@ async function verifyAndLaunchGame(gameSlug: string, roomId: string) {
       mainWindow?.webContents.send('error', { message: 'Ошибка подключения к серверу' })
     }
   }
+}
+
+// =============================================================
+// DESKTOP-GAME: запуск локальной игры (GTA «Царь горы»)
+// =============================================================
+async function startDesktopGame(gameSlug: string, roomId: string, roomToken: string, user: any) {
+  gtaState.lastError = null
+  const needAgent = requiresDesktopAgent(gameSlug)
+
+  // 1) Проверяем наличие GTA
+  let gamePath = gtaState.gamePath
+  if (!gamePath || !findGtaInDir(gamePath)) {
+    const found = autoDetectGta()
+    gamePath = found?.gamePath || null
+    gtaState.gamePath = gamePath
+  }
+  if (!gamePath) {
+    sendToMain('gta-required', { stage: 'gta-missing', message: 'GTA V Legacy не найдена — укажите папку игры.' })
+    return
+  }
+
+  // 2) Проверяем зависимости и мод
+  const dep = checkDependencies(gamePath)
+  const modInstalled = fs.existsSync(path.join(gamePath, 'scripts', 'MazLiveKOTH.dll'))
+  gtaState.modInstalled = modInstalled
+  if (!dep.ok || !modInstalled) {
+    sendToMain('gta-required', {
+      stage: !dep.ok ? 'deps-missing' : 'mod-missing',
+      message: 'Требуется установка мода / зависимостей.',
+      missing: dep.missing,
+      gamePath,
+    })
+    return
+  }
+
+  // 3) Проверяем, не запущена ли уже GTA
+  if (await isGtaRunning()) {
+    sendToMain('gta-required', { stage: 'gta-running', message: 'GTA уже запущена. Закройте игру и попробуйте снова.' })
+    return
+  }
+
+  // 4) Запускаем агент (если нужен)
+  if (needAgent) {
+    try {
+      startAgent(gamePath, roomId, roomToken, user)
+    } catch (e: any) {
+      sendToMain('gta-status', { kind: 'error', message: 'Не удалось запустить агент: ' + e.message })
+      return
+    }
+  }
+
+  // 5) Запускаем GTA V Legacy (Story Mode, без Online)
+  try {
+    launchGta(gamePath)
+  } catch (e: any) {
+    sendToMain('gta-status', { kind: 'error', message: 'Не удалось запустить GTA: ' + e.message })
+    return
+  }
+
+  // 6) Открываем панель управления GTA (локальная панель внутри Electron)
+  createGtaPanelWindow(gamePath, roomId)
+}
+
+function startAgent(gamePath: string, roomId: string, roomToken: string, user: any) {
+  // Останавливаем предыдущий агент
+  if (gtaAgent) { try { gtaAgent.disconnect() } catch {} gtaAgent = null }
+
+  gtaAgent = new GtaAgent({ gamePath, deps: { loadSocketIo } })
+  gtaAgent.on('status', (s: any) => {
+    gtaState.lastStatus = s.kind
+    sendToMain('gta-agent-status', s)
+  })
+  gtaAgent.on('command', (c: any) => sendToMain('gta-command', c))
+  gtaAgent.on('ack', (a: any) => sendToMain('gta-ack', a))
+
+  // ⚠️ Токен передаём ТОЛЬКО в память агента, никогда не сохраняем на диск.
+  gtaAgent.connect({
+    room: roomId,
+    token: roomToken,
+    nickname: user?.name || roomId,
+    gameSlug: 'gta-koth',
+    serverUrl: GAME_SERVER_SOCKET_URL,
+  }).then(() => {
+    gtaState.agentRunning = true
+    sendToMain('gta-agent-status', { kind: 'agent_started', message: 'Агент запущен' })
+  }).catch((e: any) => {
+    sendToMain('gta-agent-status', { kind: 'error', message: 'Ошибка агента: ' + e.message })
+  })
+}
+
+function createGtaPanelWindow(gamePath: string, roomId: string) {
+  if (gameWindow && !gameWindow.isDestroyed()) gameWindow.close()
+  gameWindow = new BrowserWindow({
+    width: 640,
+    height: 560,
+    title: 'Mazlive — Панель GTA (Царь горы)',
+    icon: path.join(__dirname, '../assets/icon.png'),
+    backgroundColor: '#0d1117',
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js'),
+      devTools: DEV,
+    },
+  })
+  gameWindow.setMenu(null)
+  gameWindow.setMenuBarVisibility(false)
+  const q = new URLSearchParams({ gamePath, roomId })
+  gameWindow.loadFile(path.join(__dirname, '..', 'renderer', 'gta-panel.html'), { search: '?' + q.toString() })
+  gameWindow.on('closed', () => { gameWindow = null })
 }
 
 // =============================================================
@@ -271,6 +427,68 @@ ipcMain.handle('logout', async () => {
 
 ipcMain.handle('launch-game', async (_event, { gameSlug, roomId }: { gameSlug: string; roomId: string }) => {
   await verifyAndLaunchGame(gameSlug, roomId)
+})
+
+// ─── DESKTOP-GAME (GTA) IPC ───
+ipcMain.handle('gta-detect', () => {
+  const found = autoDetectGta()
+  if (found) gtaState.gamePath = found.gamePath
+  const dep = found ? checkDependencies(found.gamePath) : null
+  const modInstalled = found ? fs.existsSync(path.join(found.gamePath, 'scripts', 'MazLiveKOTH.dll')) : false
+  gtaState.modInstalled = modInstalled
+  return {
+    found: !!found,
+    gamePath: found?.gamePath || null,
+    deps: dep,
+    modInstalled,
+  }
+})
+
+ipcMain.handle('gta-check-path', (_event, { gamePath }: { gamePath: string }) => {
+  // ✅ Валидация пути: принимаем только реальный путь к существующей папке с GTA5.exe
+  const hit = findGtaInDir(String(gamePath || ''))
+  if (!hit) return { ok: false, error: 'GTA5.exe не найден по этому пути' }
+  gtaState.gamePath = hit.gamePath
+  const dep = checkDependencies(hit.gamePath)
+  const modInstalled = fs.existsSync(path.join(hit.gamePath, 'scripts', 'MazLiveKOTH.dll'))
+  gtaState.modInstalled = modInstalled
+  return { ok: true, gamePath: hit.gamePath, deps: dep, modInstalled }
+})
+
+ipcMain.handle('gta-install-mod', async (_event, { gamePath }: { gamePath: string }) => {
+  const gp = gamePath && findGtaInDir(String(gamePath)) ? findGtaInDir(String(gamePath))!.gamePath : gtaState.gamePath
+  if (!gp) throw new Error('GTA не найдена')
+  if (await isGtaRunning()) throw new Error('Закройте GTA перед установкой мода')
+  const res = installMod(gp, modSourceDir())
+  gtaState.gamePath = gp
+  gtaState.modInstalled = true
+  return res
+})
+
+ipcMain.handle('gta-uninstall-mod', async (_event, { gamePath }: { gamePath: string }) => {
+  const gp = gamePath && findGtaInDir(String(gamePath)) ? findGtaInDir(String(gamePath))!.gamePath : gtaState.gamePath
+  if (!gp) throw new Error('GTA не найдена')
+  if (await isGtaRunning()) throw new Error('Закройте GTA перед удалением мода')
+  const res = uninstallMod(gp, modSourceDir())
+  gtaState.modInstalled = false
+  return res
+})
+
+ipcMain.handle('gta-state', () => {
+  let mod: any = null
+  if (gtaAgent) { try { mod = gtaAgent.state() } catch (e: any) { mod = { error: e.message } } }
+  return { ...gtaState, agent: mod }
+})
+
+ipcMain.handle('gta-agent-command', (_event, { action, count = 1 }: { action: string; count?: number }) => {
+  if (!gtaAgent) throw new Error('Агент не запущен')
+  return gtaAgent.control(action, { count, name: 'Streamer' })
+})
+
+ipcMain.handle('gta-agent-stop', () => {
+  if (gtaAgent) { gtaAgent.disconnect(); gtaAgent = null }
+  gtaState.agentRunning = false
+  return { ok: true }
 })
 
 ipcMain.handle('close-game', () => {
@@ -337,7 +555,12 @@ app.whenReady().then(() => {
 })
 
 app.on('window-all-closed', () => {
+  if (gtaAgent) { try { gtaAgent.disconnect() } catch {} gtaAgent = null }
   if (process.platform !== 'darwin') app.quit()
+})
+
+app.on('before-quit', () => {
+  if (gtaAgent) { try { gtaAgent.disconnect() } catch {} gtaAgent = null }
 })
 
 // =============================================================
