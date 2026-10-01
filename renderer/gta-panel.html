@@ -180,10 +180,7 @@
       <div class="inline">
         <div class="field">
           <select id="testAction">
-            <option value="car">car</option><option value="truck">truck</option>
-            <option value="tank">tank</option><option value="crate">crate</option>
-            <option value="shield">shield</option><option value="boost">boost</option>
-            <option value="checkpoint">checkpoint</option>
+            <option value="car">car</option>
           </select>
         </div>
         <div class="field" style="max-width:90px"><input id="testCount" type="number" min="1" max="12" value="1"/></div>
@@ -195,14 +192,15 @@
   <!-- НАСТРОЙКИ РЕАКЦИЙ + РАУНДА (доступны всегда) -->
   <div class="card">
     <h2>Настройки реакций (подарки · лайки · follow)</h2>
+    <div class="small" style="margin-bottom:10px">Зрители влияют на игру: подарки и подписки добавляют препятствия/помощь, лайки дают ускорение. Ниже — что какое действие делает.</div>
     <div class="inline" style="margin-bottom:8px">
-      <div class="field"><label class="label">Лайков на boost</label><input id="sLikes" type="number" min="1"/></div>
-      <div class="field"><label class="label">Follow → действие</label><select id="sFollow"></select></div>
+      <div class="field"><label class="label">⚡ Лайков на ускорение</label><input id="sLikes" type="number" min="1"/></div>
+      <div class="field"><label class="label">📌 За подписку (Follow) →</label><select id="sFollow"></select></div>
     </div>
     <div class="inline" style="margin-bottom:8px">
-      <div class="field"><label class="label">Подарок по умолчанию</label><select id="sDefGift"></select></div>
-      <div class="field"><label class="label">Монет на действие</label><input id="sCoins" type="number" min="1"/></div>
-      <div class="field"><label class="label">Макс. за событие</label><input id="sMax" type="number" min="1" max="12"/></div>
+      <div class="field"><label class="label">🎁 Подарок по умолчанию →</label><select id="sDefGift"></select></div>
+      <div class="field"><label class="label">💎 Монет на 1 действие</label><input id="sCoins" type="number" min="1"/></div>
+      <div class="field"><label class="label">🔢 Макс. действий за раз</label><input id="sMax" type="number" min="1" max="12"/></div>
     </div>
     <div class="label" style="margin:12px 0 6px">Правила подарков</div>
     <div class="small" style="margin-bottom:8px">Выбери подарок из каталога TikTok и задай, что он делает в GTA. Все остальные подарки работают по общему правилу («Монет на действие»).</div>
@@ -272,9 +270,30 @@
   function log(msg){ const l=$('log'); l.innerHTML += '<div>'+new Date().toLocaleTimeString()+' · '+msg+'</div>'; l.scrollTop=l.scrollHeight }
   function dot(el, cls){ if(el) el.className='dot '+cls }
 
+  // Человеческие названия действий мода (value остаётся англ. ID — его понимает мод).
+  const ACTION_LABELS = {
+    car:        '🚗 Легковая машина',
+    truck:      '🚚 Грузовик',
+    tank:       '🛡 Танк',
+    crate:      '📦 Ящик (препятствие)',
+    shield:     '✨ Щит (8 сек)',
+    boost:      '⚡ Ускорение (10 сек)',
+    checkpoint: '🚩 Чекпоинт (точка возрождения)',
+    reset:      '🔄 Сброс раунда',
+    start:      '▶ Старт',
+    stop:       '⏹ Стоп',
+    clear:      '🧹 Очистить',
+  }
+  const actionLabel = a => ACTION_LABELS[a] || a
+
   function fillActionSelects(){
-    const follow = $('sFollow'), def = $('sDefGift'), gpa = $('gpAction')
-    for(const a of actions){ follow.appendChild(new Option(a,a)); def.appendChild(new Option(a,a)); gpa.appendChild(new Option(a,a)) }
+    const follow = $('sFollow'), def = $('sDefGift'), gpa = $('gpAction'), ta = $('testAction')
+    for(const a of actions){
+      follow.appendChild(new Option(actionLabel(a), a))
+      def.appendChild(new Option(actionLabel(a), a))
+      gpa.appendChild(new Option(actionLabel(a), a))
+    }
+    if(ta){ ta.innerHTML=''; for(const a of actions.slice(0,7)) ta.appendChild(new Option(actionLabel(a), a)) }
   }
 
   // ─── Каталог подарков TikTok (пикер, как в других играх MAZLIVE) ───
@@ -310,7 +329,7 @@
       body.append(nm, meta); row.appendChild(body)
       row.dataset.name = r.name || ''
       const sel = document.createElement('select'); sel.dataset.k='action'
-      for(const a of actions) sel.appendChild(new Option(a,a,false,a===r.action))
+      for(const a of actions) sel.appendChild(new Option(actionLabel(a), a, false, a===r.action))
       row.appendChild(sel)
       const coins = document.createElement('input'); coins.type='number'; coins.min='1'; coins.dataset.k='coinsPerAction'; coins.value = r.coinsPerAction||1
       row.appendChild(coins)
@@ -345,7 +364,7 @@
         const coins = Math.max(1, Number($('gpCoins').value)||g.coins||1)
         const cur = collectRules(); cur.push({ name:g.name, action, coinsPerAction:coins, image_url:g.image_url, id:g.id })
         renderRules(cur); courseDirty = true
-        log('добавлено правило: «'+g.name+'» → '+action+' ×'+coins)
+        log('добавлено правило: «'+g.name+'» → '+actionLabel(action)+' ×'+coins)
       }
       grid.appendChild(c)
     })
@@ -451,7 +470,7 @@
     log('для запуска GTA используйте каталог (карточка → Запустить). Панель остаётся открытой.') }
   async function stopAll(){ try{ await api.stopAgent(); log('агент остановлен') }catch(e){ log('stop: '+e.message) } }
   const ctrl=(action)=>api.command(action,1).then(()=>log('команда: '+action)).catch(e=>log('ошибка: '+e.message))
-  async function testAction(){ try{ const a=$('testAction').value, n=Number($('testCount').value)||1; await api.command(a,n); log('тест: '+a+' ×'+n) }catch(e){ log('тест: ошибка — '+e.message) } }
+  async function testAction(){ try{ const a=$('testAction').value, n=Number($('testCount').value)||1; await api.command(a,n); log('тест: '+actionLabel(a)+' ×'+n) }catch(e){ log('тест: ошибка — '+e.message) } }
 
   async function saveSettings(){ const res = await api.settingsSet(getSettingsPayload()); await loadSettings(); log('настройки сохранены ✓'+(res.applied?(' · ini: '+res.applied):'')) }
   async function applyCourse(){ const res = await api.applyCourse(gamePath||undefined); if(res.ok) log('курс применён к моду: '+res.applied); else log('курс не применён (мод не установлен?)') }
