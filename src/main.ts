@@ -55,6 +55,7 @@ let gameWindow: BrowserWindow | null = null
 // ─── GTA desktop-game runtime ───
 let gtaAgent: any | null = null
 let gtaRefreshTimer: ReturnType<typeof setInterval> | null = null
+let gtaPanelOpen = false
 let gtaState: {
   gamePath: string | null
   modInstalled: boolean
@@ -178,10 +179,13 @@ function createMainWindow() {
   // (инъекция в DOM главного окна). Production-файлы НЕ меняются.
   // Кнопка «Запуск» вызывает узкий IPC беты (window.mazalive.gta.openPanel).
   mainWindow.webContents.on('did-finish-load', () => {
+    // Когда открыта панель мода — карточку не инжектим (это не кабинет).
+    if (gtaPanelOpen) return
     scheduleGtaCardInjection()
   })
   // SPA-переходы внутри кабинета: повторяем инъекцию
   mainWindow.webContents.on('did-navigate-in-page', () => {
+    if (gtaPanelOpen) return
     scheduleGtaCardInjection()
   })
 
@@ -557,31 +561,21 @@ async function startAgent(gamePath: string, roomId: string, roomToken: string, u
  * roomId может быть пустым (запуск из каталога до создания игровой сессии).
  */
 function openGtaPanelWindow(gamePath: string | null, roomId: string, roomToken = '') {
-  // Если панель уже открыта — фокусируем и обновляем параметры
-  if (gameWindow && !gameWindow.isDestroyed()) {
-    gameWindow.close()
-  }
-  gameWindow = new BrowserWindow({
-    width: 720,
-    height: 720,
-    minWidth: 600,
-    minHeight: 560,
-    title: 'Mazlive — Панель GTA (Царь горы)',
-    icon: path.join(__dirname, '../assets/icon.png'),
-    backgroundColor: '#0d1117',
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js'),
-      devTools: DEV,
-    },
-  })
-  gameWindow.setMenu(null)
-  gameWindow.setMenuBarVisibility(false)
+  // Панель открывается В ТОМ ЖЕ (главном) окне — без второго окна. Кнопка «Назад» вернёт на кабинет.
+  const w = mainWindow
+  if (!w || w.isDestroyed()) return
+  gtaPanelOpen = true
   // roomToken передаём в панель отдельным query-параметром (живёт только в памяти окна).
   const q = new URLSearchParams({ gamePath: gamePath || '', roomId: roomId || '', roomToken: roomToken || '' })
-  gameWindow.loadFile(path.join(__dirname, '..', 'renderer', 'gta-panel.html'), { search: '?' + q.toString() })
-  gameWindow.on('closed', () => { gameWindow = null })
+  w.loadFile(path.join(__dirname, '..', 'renderer', 'gta-panel.html'), { search: '?' + q.toString() })
+}
+
+/** Вернуться из панели мода в кабинет (главное окно). */
+function backToDashboard() {
+  gtaPanelOpen = false
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.loadURL(WEB_URL + '/dashboard')
+  }
 }
 
 /** Ник TikTok из дашборда (cookie tiktok_username). Пусто — эфир не настроен. */
@@ -698,6 +692,21 @@ ipcMain.handle('gta-agent-stop', () => {
 ipcMain.handle('gta-get-username', async () => {
   const username = await getTikTokUsername()
   return { username, agentRunning: gtaState.agentRunning, streamLive: !!gtaAgent?.streamLive }
+})
+
+// Возврат из панели мода в кабинет (панель открыта в главном окне)
+ipcMain.handle('gta-back', () => {
+  // Агент продолжает работать (эфир идёт) — просто возвращаемся в кабинет.
+  backToDashboard()
+  return { ok: true }
+})
+
+// Полное закрытие панели: остановить агент и вернуться
+ipcMain.handle('gta-close-panel', () => {
+  if (gtaAgent) { try { gtaAgent.disconnect() } catch {} gtaAgent = null }
+  gtaState.agentRunning = false
+  backToDashboard()
+  return { ok: true }
 })
 
 // ─── Подключение эфира ИЗ ПАНЕЛИ (ник → комната → агент) ───

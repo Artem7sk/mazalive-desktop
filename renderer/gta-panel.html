@@ -94,11 +94,21 @@
   .gp-params label{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:5px}
   .gp-params input{width:64px;padding:5px 7px}
   .gp-hint{font-size:10px;color:var(--muted)}
+  .topbar{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+  .backbtn{background:var(--surface2);color:#e6edf3;border:1px solid #30363d;border-radius:9px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer}
+  .backbtn:hover{background:#232b38;border-color:#4b5563}
+  .topbar-title{flex:1;min-width:0}
+  .topbar-title h1{margin:0}
 </style>
 </head>
 <body>
-  <h1>🏔️ GTA V — ЦАРЬ ГОРЫ</h1>
-  <div class="sub">Локальная панель управления · Mazlive Desktop 2.0 Beta</div>
+  <div class="topbar">
+    <button id="bBack" class="backbtn" title="Вернуться в кабинет">◀ Назад</button>
+    <div class="topbar-title">
+      <h1>🏔️ GTA V — ЦАРЬ ГОРЫ</h1>
+      <div class="sub">Локальная панель управления · Mazlive Desktop 2.0 Beta</div>
+    </div>
+  </div>
 
   <!-- ЭКРАН 1: ОНБОРДИНГ / УСТАНОВКА -->
   <div id="setup">
@@ -525,6 +535,7 @@
   $('bUninstall').onclick = uninstall
   $('bConnect').onclick = connectStream
   $('bStopAll').onclick = stopAll
+  $('bBack').onclick = () => { try { api.back() } catch(e) { log('назад: '+e.message) } }
   $('cStart').onclick = ()=>ctrl('start'); $('cStop').onclick = ()=>ctrl('stop')
   $('cClear').onclick = ()=>ctrl('clear'); $('cReset').onclick = ()=>ctrl('reset')
   $('bTest').onclick = testAction

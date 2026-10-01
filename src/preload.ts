@@ -31,6 +31,8 @@ contextBridge.exposeInMainWorld('mazalive', {
     stopAgent: () => ipcRenderer.invoke('gta-agent-stop'),
     connectStream: (username?: string, gamePath?: string) => ipcRenderer.invoke('gta-connect-stream', { username, gamePath }),
     getUsername: () => ipcRenderer.invoke('gta-get-username'),
+    back: () => ipcRenderer.invoke('gta-back'),
+    closePanel: () => ipcRenderer.invoke('gta-close-panel'),
 
     // Панель без GTA + настройки
     openPanel: () => ipcRenderer.invoke('gta-open-panel'),
