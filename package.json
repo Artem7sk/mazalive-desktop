@@ -1,70 +1,40 @@
 {
   "name": "mazlive-desktop",
-  "version": "1.1.1",
-  "description": "Mazlive Desktop — Streamer Game Launcher",
+  "version": "2.0.0-beta.1",
+  "description": "Mazlive Desktop 2.0 Beta — Streamer Game Launcher (web-games + GTA «Царь горы»)",
   "main": "dist/main.js",
   "scripts": {
-    "dev": "concurrently \"tsc -w\" \"electron .\"",
-    "build": "tsc && electron-builder",
+    "build": "tsc",
     "start": "electron .",
-    "pack": "electron-builder --dir",
-    "dist": "electron-builder",
-    "build-win": "tsc && electron-builder --win",
-    "build-mac": "tsc && electron-builder --mac"
+    "test": "node --test \"test/*.test.mjs\"",
+    "dist": "npm run build && electron-builder",
+    "build-win": "npm run build && electron-builder --win",
+    "build-mac": "npm run build && electron-builder --mac"
   },
+  "author": "Mazlive",
+  "license": "UNLICENSED",
   "dependencies": {
-    "axios": "^1.7.3",
     "electron-store": "^8.2.0",
-    "electron-updater": "^6.8.9"
+    "electron-updater": "^6.3.9",
+    "socket.io-client": "^4.7.5"
   },
   "devDependencies": {
-    "@types/node": "^20",
-    "concurrently": "^8.2.2",
-    "electron": "31.7.7",
+    "electron": "^31.7.7",
     "electron-builder": "^24.13.3",
-    "typescript": "^5"
+    "typescript": "^5.5.4",
+    "@types/node": "^20.14.0"
   },
   "build": {
-    "appId": "com.mazalive.desktop",
-    "productName": "Mazlive",
-    "win": {
-      "target": "nsis",
-      "icon": "assets/icon.png"
-    },
-    "mac": {
-      "target": "zip",
-      "icon": "assets/icon.png"
-    },
-    "linux": {
-      "target": "AppImage"
-    },
-    "protocols": [
-      {
-        "name": "Mazlive Protocol",
-        "schemes": [
-          "mazalive"
-        ]
-      }
+    "appId": "com.mazlive.desktop",
+    "productName": "Mazlive Desktop",
+    "files": ["dist/**/*", "renderer/**/*", "agent/**/*", "mod/**/*", "assets/**/*"],
+    "extraResources": [
+      { "from": "agent", "to": "agent" },
+      { "from": "mod", "to": "mod" }
     ],
-    "nsis": {
-      "oneClick": true,
-      "perMachine": false,
-      "allowToChangeInstallationDirectory": false
-    },
-    "publish": [
-      {
-        "provider": "generic",
-        "url": "https://mazlive.com/api/updates/",
-        "channel": "latest"
-      }
-    ],
-    "files": [
-      "dist/**/*",
-      "renderer/**/*",
-      "assets/**/*",
-      "package.json"
-    ],
-    "asar": true
-  },
-  "author": "Mazlive"
+    "win": { "target": "nsis" },
+    "mac": { "target": "zip" },
+    "linux": { "target": "AppImage" },
+    "publish": { "provider": "generic", "url": "https://mazlive.com/api/updates/" }
+  }
 }
