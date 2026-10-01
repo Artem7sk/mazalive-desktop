@@ -11,7 +11,9 @@ import {
 import path from 'path'
 import fs from 'node:fs'
 import axios from 'axios'
-import { autoUpdater } from 'electron-updater'
+// electron-updater грузим ЛЕНИВО (require) и в try/catch: его геттер autoUpdater
+// бросает при невалидной версии приложения, и это уронило бы весь main-процесс.
+// В упакованном виде версия валидна, но защищаемся от любых сбоев апдейтера.
 import { tokenStore } from './auth/tokenStore'
 import { isDesktopGame, requiresDesktopAgent } from './games/registry'
 import {
@@ -23,8 +25,13 @@ import {
   launchGta,
   isGtaRunning,
 } from './gta/gtaMod'
-// @ts-ignore — .mjs адаптер мода (переиспользуем как есть)
-import { GtaAgent } from '../agent/gta-agent.mjs'
+// Агент (ESM .mjs) грузится ЛЕНИВО через CJS-обёртку с нативным import().
+// Нельзя делать статический import '../agent/gta-agent.mjs': TS превратит его в
+// require() → ERR_REQUIRE_ESM в упакованном Electron. См. agent/load-agent.js.
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { loadAgent } = require('../agent/load-agent.js') as {
+  loadAgent: () => Promise<{ GtaAgent: any }>
+}
 
 const APP_VERSION = app.getVersion()
 
@@ -45,7 +52,7 @@ let mainWindow: BrowserWindow | null = null
 let gameWindow: BrowserWindow | null = null
 
 // ─── GTA desktop-game runtime ───
-let gtaAgent: GtaAgent | null = null
+let gtaAgent: any | null = null
 let gtaState: {
   gamePath: string | null
   modInstalled: boolean
@@ -339,9 +346,10 @@ async function startDesktopGame(gameSlug: string, roomId: string, roomToken: str
   // 4) Запускаем агент (если нужен)
   if (needAgent) {
     try {
-      startAgent(gamePath, roomId, roomToken, user)
+      await startAgent(gamePath, roomId, roomToken, user)
     } catch (e: any) {
       sendToMain('gta-status', { kind: 'error', message: 'Не удалось запустить агент: ' + e.message })
+      sendToMain('gta-agent-status', { kind: 'error', message: 'Агент недоступен: ' + e.message })
       return
     }
   }
@@ -358,9 +366,13 @@ async function startDesktopGame(gameSlug: string, roomId: string, roomToken: str
   createGtaPanelWindow(gamePath, roomId)
 }
 
-function startAgent(gamePath: string, roomId: string, roomToken: string, user: any) {
+async function startAgent(gamePath: string, roomId: string, roomToken: string, user: any) {
   // Останавливаем предыдущий агент
   if (gtaAgent) { try { gtaAgent.disconnect() } catch {} gtaAgent = null }
+
+  // ЛЕНИВАЯ загрузка ESM-агента через CJS-обёртку (нативный import()).
+  // Если модуль недоступен — бросаем наверх, НЕ блокируя вход и web-игры.
+  const { GtaAgent } = await loadAgent()
 
   gtaAgent = new GtaAgent({ gamePath, deps: { loadSocketIo } })
   gtaAgent.on('status', (s: any) => {
@@ -573,19 +585,93 @@ app.on('before-quit', () => {
 // =============================================================
 // АВТО-ОБНОВЛЕНИЕ (electron-updater, провайдер generic)
 // Проверяем обновление при старте + по IPC-запросу из renderer.
-// Пользователю показываем нативное окно: «Доступно обновление» → Обновить.
+// ВАЖНО: загрузка и init обёрнуты в try/catch — сбой апдейтера НЕ должен
+// ронять main-процесс (был кейс: невалидная версия → падение на старте).
 // =============================================================
-autoUpdater.autoDownload = false          // не качаем молча — спрашиваем
-autoUpdater.autoInstallOnAppQuit = true
-autoUpdater.logger = null
+let autoUpdater: any = null
+
+function initUpdater(): boolean {
+  if (autoUpdater) return true
+  if (DEV) return false // в dev-режиме авто-обновление не работает
+  try {
+    // Ленивый require: геттер autoUpdater бросает при невалидной версии.
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    autoUpdater = require('electron-updater').autoUpdater
+    autoUpdater.autoDownload = false          // не качаем молча — спрашиваем
+    autoUpdater.autoInstallOnAppQuit = true
+    autoUpdater.logger = null
+
+    autoUpdater.on('update-available', (info: any) => {
+      dialog
+        .showMessageBox(mainWindow ?? undefined as any, {
+          type: 'info',
+          title: 'Доступно обновление',
+          message: `Вышла новая версия Mazlive ${info.version}`,
+          detail: `У вас установлена ${APP_VERSION}. Обновить сейчас? Приложение загрузит новую версию и перезапустится.`,
+          buttons: ['Обновить', 'Позже'],
+          defaultId: 0,
+          cancelId: 1,
+        })
+        .then((res) => {
+          if (res.response === 0) {
+            autoUpdater.downloadUpdate().catch(() => {})
+          }
+        })
+    })
+
+    autoUpdater.on('update-not-available', () => {
+      console.log('[Updater] already up to date:', APP_VERSION)
+    })
+
+    autoUpdater.on('download-progress', (p: any) => {
+      mainWindow?.webContents.send('update-progress', { percent: Math.round(p.percent) })
+    })
+
+    autoUpdater.on('update-downloaded', (info: any) => {
+      dialog
+        .showMessageBox(mainWindow ?? undefined as any, {
+          type: 'info',
+          title: 'Обновление готово',
+          message: `Mazlive ${info.version} загружено`,
+          detail: 'Перезапустить приложение сейчас, чтобы применить обновление?',
+          buttons: ['Перезапустить', 'Позже'],
+          defaultId: 0,
+          cancelId: 1,
+        })
+        .then((res) => {
+          if (res.response === 0) {
+            setImmediate(() => autoUpdater.quitAndInstall())
+          }
+        })
+    })
+
+    autoUpdater.on('error', (err: any) => {
+      console.log('[Updater] error:', err?.message)
+    })
+    return true
+  } catch (err: any) {
+    console.log('[Updater] недоступен:', err?.message)
+    autoUpdater = null
+    return false
+  }
+}
 
 function checkForUpdates(interactive = false) {
-  // Авто-обновление не работает в dev-режиме
   if (DEV) {
     if (interactive) dialog.showMessageBox({ message: 'Обновления отключены в режиме разработки' })
     return
   }
-  autoUpdater.checkForUpdates().catch((err) => {
+  if (!initUpdater()) {
+    if (interactive) {
+      dialog.showMessageBox(mainWindow ?? undefined as any, {
+        type: 'info',
+        title: 'Обновление',
+        message: 'Авто-обновление недоступно в этой сборке.',
+      })
+    }
+    return
+  }
+  autoUpdater.checkForUpdates().catch((err: any) => {
     console.log('[Updater] check failed:', err?.message)
     if (interactive) {
       dialog.showMessageBox(mainWindow ?? undefined as any, {
@@ -596,54 +682,6 @@ function checkForUpdates(interactive = false) {
     }
   })
 }
-
-autoUpdater.on('update-available', (info) => {
-  dialog
-    .showMessageBox(mainWindow ?? undefined as any, {
-      type: 'info',
-      title: 'Доступно обновление',
-      message: `Вышла новая версия Mazlive ${info.version}`,
-      detail: `У вас установлена ${APP_VERSION}. Обновить сейчас? Приложение загрузит новую версию и перезапустится.`,
-      buttons: ['Обновить', 'Позже'],
-      defaultId: 0,
-      cancelId: 1,
-    })
-    .then((res) => {
-      if (res.response === 0) {
-        autoUpdater.downloadUpdate().catch(() => {})
-      }
-    })
-})
-
-autoUpdater.on('update-not-available', () => {
-  console.log('[Updater] already up to date:', APP_VERSION)
-})
-
-autoUpdater.on('download-progress', (p) => {
-  mainWindow?.webContents.send('update-progress', { percent: Math.round(p.percent) })
-})
-
-autoUpdater.on('update-downloaded', (info) => {
-  dialog
-    .showMessageBox(mainWindow ?? undefined as any, {
-      type: 'info',
-      title: 'Обновление готово',
-      message: `Mazlive ${info.version} загружено`,
-      detail: 'Перезапустить приложение сейчас, чтобы применить обновление?',
-      buttons: ['Перезапустить', 'Позже'],
-      defaultId: 0,
-      cancelId: 1,
-    })
-    .then((res) => {
-      if (res.response === 0) {
-        setImmediate(() => autoUpdater.quitAndInstall())
-      }
-    })
-})
-
-autoUpdater.on('error', (err) => {
-  console.log('[Updater] error:', err?.message)
-})
 
 // Ручной запрос проверки из renderer (кнопка «Проверить обновления»)
 ipcMain.handle('check-updates', () => {

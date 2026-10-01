@@ -119,3 +119,40 @@ if (type==='follow')return `follow:${uid}:${timestamp}`;
 
 ⚠️ **HTTP 200 ≠ функциональная регрессия.** В прошлом отчёте 200 для игр означал лишь,
 что файлы отдаются сервером. Реальное «игра запустилась и показывает подарки» — проверяется только в приложении.
+
+---
+
+## 🔴 ИНЦИДЕНТ beta.1 → исправлено в beta.2
+
+### Симптом (сообщил Артём)
+При запуске упакованного приложения главный процесс падал:
+```
+ERR_REQUIRE_ESM: require() of ES Module resources/app.asar/agent/gta-agent.mjs
+  at resources/app.asar/dist/main.js:15:25
+```
+
+### Причины (найдены фактически)
+1. **Главная:** `tsconfig` компилирует main в **CommonJS** (`module: commonjs`). Статический
+   `import { GtaAgent } from '../agent/gta-agent.mjs'` TypeScript превращал в
+   `require("../agent/gta-agent.mjs")` → ESM нельзя грузить через `require()` → `ERR_REQUIRE_ESM`.
+   Причём даже `import()` в TS (при module=commonjs) компилируется в `Promise.resolve().then(()=>require(...))`
+   → тот же провал. Простое переименование `.mjs`→`.cjs` не решает: файлы используют ESM-синтаксис
+   (`import`/`export`) и импортируют друг друга как ESM.
+2. **Побочная:** `import { autoUpdater } from 'electron-updater'` на верхнем уровне — геттер `autoUpdater`
+   **бросает исключение** при невалидной версии приложения → падал весь main.
+
+### Исправления (beta.2)
+1. `agent/load-agent.js` — **CJS-обёртка** с **нативным `import()`** (этот файл — чистый JS, вне `src/`,
+   tsc его не компилирует, поэтому `import()` остаётся настоящим). main делает `require('../agent/load-agent.js')`
+   → внутри работает `await import('./gta-agent.mjs')`.
+2. Загрузка агента — **ленивая**: происходит при открытии GTA-функции (`startAgent`), в `try/catch`.
+   Сбой агента → ошибка в панели, **но вход и обычные web-игры НЕ блокируются**.
+3. `electron-updater` — ленивый `require` в `initUpdater()` с try/catch. Сбой апдейтера больше не роняет main.
+4. **CI smoke-тест упакованного приложения** (`scripts/smoke-packaged.js`), запускается в CI на Windows
+   ПОСЛЕ сборки. Проверяет: (а) asar содержит нужные файлы, (б) **агент реально грузится ИЗ app.asar**,
+   (в) `GtaAgent` инстанцируется, (г) главное окно открывается без uncaught-исключений.
+   Локально прогнан: **SMOKE RESULT: PASS**.
+
+### Версии
+- Electron `31.7.7`, встроенный Node (Electron 31 → Node 20.x), сборка CI на Node 20, tsc `module: commonjs`, target ES2020.
+- Артефакт beta.1 был `app.asar` с `dist/main.js` (CJS) + `agent/*.mjs` (ESM) — смешение форматов и было причиной.

@@ -28,6 +28,13 @@ jobs:
         run: npx tsc && npx electron-builder --win
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Smoke-test packaged app (asar: agent ESM load + window)
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "dist\win-unpacked\resources\app.asar")) { Write-Error "app.asar not found"; exit 1 }
+          Write-Host "app.asar OK"
+          node_modules\.bin\electron.cmd scripts\smoke-packaged.js
+          if ($LASTEXITCODE -ne 0) { Write-Error "smoke test failed"; exit 1 }
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
