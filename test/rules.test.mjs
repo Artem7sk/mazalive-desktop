@@ -50,6 +50,25 @@ test('two distinct gifts same user same ms do not collapse (giftId differs)',()=
   assert.equal(r.accept(b).length,1);   // другой giftId → не схлопываем
 });
 
+// ⚠️ ОГРАНИЧЕНИЕ (документируем, не прячем): два ИДЕНТИЧНЫХ события одного зрителя
+// за одну мс без серверного ID неразличимы → второе схлопывается.
+// Это ОЖИДАЕМОЕ поведение эвристики. Фикс — уникальный eventId/msgId из game-server.
+test('KNOWN LIMITATION: two IDENTICAL gifts same user same ms collapse without server id',()=>{
+  const r=new Router();
+  const same={type:'gift',giftType:2,user:'u',giftName:'Rose',giftId:'5655',giftValue:1,repeatCount:1,timestamp:7};
+  assert.equal(r.accept({...same}).length,1);
+  assert.equal(r.accept({...same}).length,0); // ← схлопнуто (ограничение)
+});
+
+// С уникальным eventId от сервера — оба идентичных события проходят.
+test('with server eventId: two identical gifts both pass, repeat delivery ignored',()=>{
+  const r=new Router();
+  const base={type:'gift',giftType:2,user:'u',giftName:'Rose',giftId:'5655',giftValue:1,repeatCount:1,timestamp:7};
+  assert.equal(r.accept({...base,eventId:'e1'}).length,1);
+  assert.equal(r.accept({...base,eventId:'e2'}).length,1);   // другое событие → проходит
+  assert.equal(r.accept({...base,eventId:'e1'}).length,0);   // повторная доставка e1 → игнор
+});
+
 test('Rose → car (per coin), other gift → truck (per 10 coins, min 1)',()=>{
   const r=new Router();
   const rose=r.accept({type:'gift',giftType:2,user:'u',giftName:'Rose',giftId:'5655',giftValue:1,repeatCount:3,timestamp:1});
