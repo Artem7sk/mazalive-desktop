@@ -1,6 +1,4 @@
 node_modules/
 dist/
-*.bak_*
-*.exe
-*.dmg
-*.zip
+*.log
+.DS_Store

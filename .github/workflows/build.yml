@@ -1,58 +1,60 @@
-name: Build MazaLive Desktop
+name: Build Mazlive Desktop 2.0 Beta
 
 on:
   push:
     tags:
-      - 'v*'
+      - 'v2.*'
   workflow_dispatch:
-
-permissions:
-  contents: write
+    inputs:
+      tag:
+        description: 'Release tag (e.g. v2.0.0-beta.1)'
+        required: false
 
 jobs:
-  build-mac:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - name: Install dependencies
-        run: npm install
-      - name: Build Mac
-        run: npm run build-mac
-        env:
-          CSC_IDENTITY_AUTO_DISCOVERY: false
-
-      - name: Upload mac artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: Mazlive-mac
-          path: |
-            dist/*.zip
-            dist/*.dmg
-            dist/latest-mac.yml
-
   build-win:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
-      - name: Install dependencies
-        run: npm install
-      - name: Build Windows
-        run: npm run build-win
+          node-version: '20'
+      - name: Install deps
+        run: npm ci
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Unit tests (agent/rules/bridge)
+        run: npm test
+      - name: Build Windows EXE (NSIS)
+        run: npx tsc && npx electron-builder --win
         env:
-          CSC_IDENTITY_AUTO_DISCOVERY: false
-
-      # latest.yml обязателен для авто-обновления (electron-updater)
-      - name: Upload installer + update manifest
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Mazlive-Setup-Windows
+          name: mazlive-desktop-v2-beta-win
           path: |
             dist/*.exe
-            dist/*.msi
+            dist/*.exe.blockmap
             dist/latest.yml
+          if-no-files-found: warn
+
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm ci
+      - run: npm test
+      - run: npx tsc && npx electron-builder --mac
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mazlive-desktop-v2-beta-mac
+          path: |
+            dist/*.zip
+            dist/*.dmg
+            dist/latest-mac.yml
+          if-no-files-found: warn

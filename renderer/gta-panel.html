@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:;"/>
+<title>Mazlive — Панель GTA «Царь горы»</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Syne:wght@400;600;700&display=swap" rel="stylesheet"/>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --purple:#a855f7;--blue:#3b82f6;--cyan:#06b6d4;--gold:#ffd700;
+    --bg:#0d1117;--surface:#161b22;--surface2:#1c2330;--border:#30363d;
+    --text:#e6edf3;--muted:#8b949e;--ok:#22c55e;--warn:#f59e0b;--err:#ef4444;
+  }
+  body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;padding:18px;min-height:100vh}
+  h1{font-family:'Orbitron';font-size:18px;letter-spacing:1px;background:linear-gradient(90deg,var(--gold),var(--purple));-webkit-background-clip:text;background-clip:text;color:transparent;margin-bottom:4px}
+  .sub{color:var(--muted);font-size:12px;margin-bottom:16px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:14px}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+  .row:last-child{margin-bottom:0}
+  .label{color:var(--muted);font-size:13px}
+  .val{font-size:13px;font-weight:700}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle}
+  .dot.ok{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+  .dot.warn{background:var(--warn);box-shadow:0 0 8px var(--warn)}
+  .dot.err{background:var(--err);box-shadow:0 0 8px var(--err)}
+  .dot.idle{background:var(--muted)}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  button{background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-family:'Syne';font-size:13px;font-weight:600;cursor:pointer;transition:.15s}
+  button:hover{border-color:var(--purple);background:#21293a}
+  button.primary{background:linear-gradient(135deg,var(--purple),var(--blue));border:none}
+  button.danger{border-color:#7f1d1d;color:#fca5a5}
+  .stat{background:var(--surface2);border-radius:10px;padding:8px 10px;text-align:center}
+  .stat .n{font-family:'Orbitron';font-size:20px;font-weight:900;color:var(--cyan)}
+  .stat .t{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  .log{background:#0a0d13;border-radius:8px;padding:8px;height:110px;overflow-y:auto;font-family:monospace;font-size:11px;color:var(--muted);line-height:1.5}
+  .progress{height:8px;background:var(--surface2);border-radius:4px;overflow:hidden;margin-top:6px}
+  .progress>i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--cyan),var(--purple));transition:width .3s}
+</style>
+</head>
+<body>
+  <h1>🏔️ GTA V — ЦАРЬ ГОРЫ</h1>
+  <div class="sub">Локальная панель управления · Mazlive Desktop 2.0</div>
+
+  <div class="card">
+    <div class="row"><span class="label"><span id="dotConn" class="dot idle"></span>Соединение с MazLive</span><span class="val" id="vConn">—</span></div>
+    <div class="row"><span class="label"><span id="dotStream" class="dot idle"></span>Эфир</span><span class="val" id="vStream">—</span></div>
+    <div class="row"><span class="label"><span id="dotMod" class="dot idle"></span>Мод</span><span class="val" id="vMod">—</span></div>
+    <div class="row"><span class="label"><span id="dotPhase" class="dot idle"></span>Раунд</span><span class="val" id="vPhase">—</span></div>
+    <div class="progress"><i id="prog"></i></div>
+  </div>
+
+  <div class="card">
+    <div class="grid" style="grid-template-columns:repeat(4,1fr)">
+      <div class="stat"><div class="n" id="sWin">0</div><div class="t">Победы</div></div>
+      <div class="stat"><div class="n" id="sFall">0</div><div class="t">Паления</div></div>
+      <div class="stat"><div class="n" id="sObj">0</div><div class="t">Объекты</div></div>
+      <div class="stat"><div class="n" id="sQueue">0</div><div class="t">Очередь</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="label" style="margin-bottom:8px">Управление (для стримера)</div>
+    <div class="grid" style="grid-template-columns:1fr 1fr 1fr 1fr">
+      <button class="primary" id="bStart">▶ Старт</button>
+      <button id="bStop">⏹ Стоп</button>
+      <button id="bClear">🧹 Очистить</button>
+      <button id="bReset">↺ Сброс</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="label" style="margin-bottom:8px">Журнал</div>
+    <div class="log" id="log"></div>
+  </div>
+
+<script>
+  const q = new URLSearchParams(location.search)
+  const roomId = q.get('roomId') || ''
+  const api = window.mazalive && window.mazalive.gta
+  const $ = (id) => document.getElementById(id)
+  function log(msg){ const l=$('log'); l.innerHTML += '<div>'+new Date().toLocaleTimeString()+' · '+msg+'</div>'; l.scrollTop=l.scrollHeight }
+  function dot(el, cls){ el.className='dot '+cls }
+
+  async function refresh(){
+    if(!api) return
+    try{
+      const st = await api.state()
+      const a = st.agent || {}
+      dot($('dotConn'), a.connected?'ok':'err'); $('vConn').textContent = a.connected?'подключено':'нет'
+      dot($('dotStream'), a.streamLive?'ok':'warn'); $('vStream').textContent = a.streamLive?'LIVE':'ожидание'
+      dot($('dotMod'), a.modOnline?'ok':'err'); $('vMod').textContent = a.modOnline?('v'+(a.mod&&a.mod.version||'')):(a.modError||'офлайн')
+      const phase = a.mod && a.mod.phase || '—'
+      dot($('dotPhase'), phase==='running'?'ok':phase==='error'?'err':'idle'); $('vPhase').textContent = phase
+      const m = a.mod||{}
+      $('sWin').textContent=m.wins??0; $('sFall').textContent=m.falls??0
+      $('sObj').textContent=m.objects??0; $('sQueue').textContent=m.queue??0
+      $('prog').style.width = ((m.progress??0)*100)+'%'
+    }catch(e){}
+  }
+
+  if(api){
+    api.onAgentStatus(d=>log('агент: '+d.message))
+    api.onStatus(d=>log('мод: '+d.message))
+    api.onCommand(d=>log('→ '+d.action+' ×'+d.count+' от '+d.name))
+    api.onAck(d=>log('✓ '+d.action+' — '+(d.outcome||'ok')))
+    api.onRequired(d=>log('⚠️ '+(d.message||d.stage)))
+  }
+  const ctrl=(action)=>api&&api.command(action,1).then(()=>log('команда: '+action)).catch(e=>log('ошибка: '+e.message))
+  $('bStart').onclick=()=>ctrl('start'); $('bStop').onclick=()=>ctrl('stop')
+  $('bClear').onclick=()=>ctrl('clear'); $('bReset').onclick=()=>ctrl('reset')
+
+  setInterval(refresh, 1000); refresh()
+</script>
+</body>
+</html>
