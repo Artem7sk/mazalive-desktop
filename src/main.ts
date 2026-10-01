@@ -366,26 +366,49 @@ async function createGameWindow(gameSlug: string, roomId: string, roomToken: str
 // =============================================================
 // Захват сессии из cookies после логина
 // =============================================================
-async function captureSessionFromCookies() {
+// Ищем cookie сессии Auth.js среди всех источников (defaultSession + все сессии окон).
+async function findSessionCookie(): Promise<string | null> {
+  const names = ['authjs.session-token', '__Secure-authjs.session-token']
   try {
-    // Получаем cookie сессии из WebView
-    const cookies = await session.defaultSession.cookies.get({ url: WEB_URL })
-    const sessionCookie = cookies.find(
-      (c) => c.name === 'authjs.session-token' || c.name === '__Secure-authjs.session-token'
-    )
+    const urls = [WEB_URL, `${WEB_URL}/dashboard`, `${WEB_URL}/login`]
+    for (const u of urls) {
+      const cookies = await session.defaultSession.cookies.get({ url: u })
+      const hit = cookies.find((c) => names.includes(c.name))
+      if (hit?.value) return hit.value
+    }
+    // На всякий случай — без url-фильтра
+    const all = await session.defaultSession.cookies.get({})
+    const hit = all.find((c) => names.includes(c.name))
+    if (hit?.value) return hit.value
+  } catch (e) {}
+  // Фолбэк: сессия конкретного окна (главное окно = прод-кабинет, там уже залогинены)
+  try {
+    const ses = mainWindow?.webContents.session
+    if (ses) {
+      const cookies = await ses.cookies.get({})
+      const hit = cookies.find((c) => names.includes(c.name))
+      if (hit?.value) return hit.value
+    }
+  } catch (e) {}
+  return null
+}
 
-    if (!sessionCookie) return
+async function captureSessionFromCookies(): Promise<string | null> {
+  try {
+    // Получаем cookie сессии из WebView (defaultSession + окна)
+    const tokenValue = await findSessionCookie()
+    if (!tokenValue) return null
 
     // Проверяем токен на сервере
     const res = await axios.get(`${WEB_URL}/api/auth/verify-subscription`, {
-      headers: { Authorization: `Bearer ${sessionCookie.value}` },
+      headers: { Authorization: `Bearer ${tokenValue}` },
     })
 
     if (res.data.valid) {
       // Сохраняем данные авторизации
       const user = res.data
       tokenStore.save({
-        sessionToken: sessionCookie.value,
+        sessionToken: tokenValue,
         userId: user.userId,
         userName: user.name || 'Streamer',
         userEmail: user.email || '',
@@ -398,17 +421,29 @@ async function captureSessionFromCookies() {
       // Открываем главное окно
       if (!mainWindow) createMainWindow()
       mainWindow?.focus()
+      return tokenValue
     }
+    return null
   } catch (err) {
     console.error('[Auth] Failed to capture session:', err)
+    return null
   }
+}
+
+// Возвращает рабочий токен: из store, а если его нет — восстанавливает из cookies.
+// Нужно, т.к. главное окно = прод-кабинет с живой сессией в куках,
+// но tokenStore мог не сохраниться (первый запуск / сброс store).
+async function resolveToken(): Promise<string | null> {
+  const stored = tokenStore.getToken()
+  if (stored) return stored
+  return await captureSessionFromCookies()
 }
 
 // =============================================================
 // Проверка подписки перед запуском игры
 // =============================================================
 async function verifyAndLaunchGame(gameSlug: string, roomId: string) {
-  const token = tokenStore.getToken()
+  const token = await resolveToken()
   if (!token) {
     mainWindow?.webContents.send('auth-required')
     return
@@ -751,7 +786,7 @@ ipcMain.handle('gta-connect-stream', async (_e, { username, gamePath }: { userna
 // Мод доступен только по общей PRO-подписке (как остальные игры MAZLIVE).
 // Проверяем подписку на сервере ДО открытия панели; при отказе — нативный диалог.
 ipcMain.handle('gta-open-panel', async () => {
-  const token = tokenStore.getToken()
+  const token = await resolveToken()
   if (!token) {
     mainWindow?.webContents.send('auth-required')
     await showGtaModal('auth')
