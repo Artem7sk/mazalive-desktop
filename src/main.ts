@@ -172,6 +172,18 @@ function createMainWindow() {
   mainWindow.setMenuBarVisibility(false)
   mainWindow.setAutoHideMenuBar(true)
 
+  // ─── БЕТА: карточка локальной игры «GTA V — Царь горы» ───
+  // Каталог приходит с production-сайта, поэтому карточку добавляем СРЕДСТВАМИ БЕТЫ
+  // (инъекция в DOM главного окна). Production-файлы НЕ меняются.
+  // Кнопка «Запуск» вызывает узкий IPC беты (window.mazalive.gta.openPanel).
+  mainWindow.webContents.on('did-finish-load', () => {
+    scheduleGtaCardInjection()
+  })
+  // SPA-переходы внутри кабинета: повторяем инъекцию
+  mainWindow.webContents.on('did-navigate-in-page', () => {
+    scheduleGtaCardInjection()
+  })
+
   if (DEV) {
     mainWindow.webContents.openDevTools()
   }
@@ -179,6 +191,76 @@ function createMainWindow() {
   mainWindow.on('closed', () => {
     mainWindow = null
   })
+}
+
+/**
+ * Надёжная инъекция карточки: каталог рендерится React'ом асинхронно,
+ * поэтому пробуем несколько раз с интервалом, пока карточка не появится.
+ */
+function scheduleGtaCardInjection(attempt = 0) {
+  setTimeout(async () => {
+    const ok = await injectGtaCard()
+    if (ok) {
+      if (attempt === 0 || attempt === 12) console.log('[beta] GTA-карточка добавлена в каталог')
+      return
+    }
+    if (attempt < 12) scheduleGtaCardInjection(attempt + 1)
+    else console.log('[beta] GTA-карточка: каталог не найден (возможно, пользователь не залогинен)')
+  }, attempt === 0 ? 1200 : 800)
+}
+
+/**
+ * Инъекция карточки «GTA V — Царь горы» в каталог production-дашборда.
+ * Идемпотентно: повторный вызов не создаёт дубликат. Полностью изолировано от прода —
+ * меняется только DOM в окне беты. Возвращает true, если карточка присутствует.
+ */
+async function injectGtaCard(): Promise<boolean> {
+  if (!mainWindow || mainWindow.isDestroyed()) return false
+  const script = `(() => {
+    if (document.getElementById('__beta_gta_card')) return true;
+    // Ищем сетку каталога игр: контейнер с НАИБОЛЬШИМ числом карточек,
+    // содержащих кнопки «Запустить/Запуск/Launch».
+    const btns = Array.from(document.querySelectorAll('button, a'))
+      .filter(el => /запустить|запуск|launch/i.test((el.textContent || '').trim()));
+    if (!btns.length) return false;
+    const counts = new Map();
+    for (const b of btns) {
+      const g = b.closest('div.grid') || b.closest('div[class*="grid-cols-3"]');
+      if (g) counts.set(g, (counts.get(g) || 0) + 1);
+    }
+    if (!counts.size) return false;
+    // Берём сетку с максимумом игровых карточек (каталог), а не случайный grid.
+    let grid = null, best = -1;
+    for (const [g, n] of counts) { if (n > best) { best = n; grid = g; } }
+    if (!grid) return false;
+
+    const card = document.createElement('div');
+    card.id = '__beta_gta_card';
+    card.className = grid.firstElementChild ? grid.firstElementChild.className : '';
+    card.style.position = 'relative';
+    card.innerHTML = \`
+      <div style="font-size:32px;margin-bottom:10px">🏔️</div>
+      <div style="font-weight:800;font-size:15px;margin-bottom:6px;color:#e6edf3">GTA V — Царь горы <span style="font-size:10px;background:linear-gradient(135deg,#a855f7,#3b82f6);color:#fff;padding:2px 7px;border-radius:99px;vertical-align:middle">BETA</span></div>
+      <div style="font-size:12px;color:#8b949e;line-height:1.5;margin-bottom:14px">Локальная игра: подарки, лайки и follow управляют боем в GTA V (Story Mode). Работает на этом ПК.</div>
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:10px;padding:3px 8px;border-radius:99px;background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.3);color:#c084fc">DESKTOP</span>
+        <button id="__beta_gta_launch" style="background:linear-gradient(135deg,#a855f7,#3b82f6);color:#fff;border:none;padding:7px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600">▶ Запуск</button>
+      </div>\`;
+    grid.appendChild(card);
+    card.querySelector('#__beta_gta_launch').addEventListener('click', async (e) => {
+      e.preventDefault(); e.stopPropagation();
+      const b = e.currentTarget; const old = b.textContent; b.disabled = true; b.textContent = '⟳ Открываем…';
+      try { await window.mazalive.gta.openPanel(); } catch (err) { console.error('gta openPanel', err); }
+      setTimeout(() => { b.disabled = false; b.textContent = old; }, 1200);
+    });
+    return true;
+  })()`
+  try {
+    const ok = await mainWindow.webContents.executeJavaScript(script, true)
+    return !!ok
+  } catch {
+    return false
+  }
 }
 
 // =============================================================
