@@ -16,6 +16,7 @@ import axios from 'axios'
 // В упакованном виде версия валидна, но защищаемся от любых сбоев апдейтера.
 import { tokenStore } from './auth/tokenStore'
 import { isDesktopGame, requiresDesktopAgent } from './games/registry'
+import { gtaSettings, MOD_ACTIONS } from './settings/gtaSettings'
 import {
   autoDetectGta,
   findGtaInDir,
@@ -66,6 +67,28 @@ function modSourceDir(): string {
   const packaged = path.join(process.resourcesPath || '', 'mod')
   if (fs.existsSync(packaged)) return packaged
   return path.join(__dirname, '..', 'mod')
+}
+
+/**
+ * Записывает настройки раунда/трассы в scripts/MazLiveKOTH/settings.ini установленного мода.
+ * Возвращает путь к записанному файлу или null, если мод/папка недоступны.
+ * ПРИМЕЧАНИЕ: применяется на следующем рестарте раунда в GTA (F10/F7), как описано в моде.
+ */
+function applyCourseSettingsToMod(gamePath: string | null): string | null {
+  if (!gamePath) return null
+  const kothDir = path.join(gamePath, 'scripts', 'MazLiveKOTH')
+  if (!fs.existsSync(kothDir)) return null
+  const s = gtaSettings.get()
+  const ini =
+    '[Course]\n' +
+    '; Slope: 8-28 degrees. Restart course with F10 / F7 after editing.\n' +
+    `Angle = ${s.course.angle}\n` +
+    '; 6-24 segments, actual meters depend on GTA model dimensions.\n' +
+    `Segments = ${s.course.segments}\n` +
+    `RoundSeconds = ${s.course.roundSeconds}\n`
+  const dest = path.join(kothDir, 'settings.ini')
+  fs.writeFileSync(dest, ini, 'utf8')
+  return dest
 }
 
 // Динамическая загрузка socket.io-client (упакован в Electron, юзеру Node не нужен)
@@ -320,6 +343,8 @@ async function startDesktopGame(gameSlug: string, roomId: string, roomToken: str
   }
   if (!gamePath) {
     sendToMain('gta-required', { stage: 'gta-missing', message: 'GTA V Legacy не найдена — укажите папку игры.' })
+    // Открываем панель онбординга, чтобы стример выбрал папку/поставил мод не выходя из приложения.
+    openGtaPanelWindow(null, roomId)
     return
   }
 
@@ -334,6 +359,8 @@ async function startDesktopGame(gameSlug: string, roomId: string, roomToken: str
       missing: dep.missing,
       gamePath,
     })
+    // Открываем панель онбординга (проверка зависимостей / установка мода).
+    openGtaPanelWindow(gamePath, roomId)
     return
   }
 
@@ -397,11 +424,22 @@ async function startAgent(gamePath: string, roomId: string, roomToken: string, u
   })
 }
 
-function createGtaPanelWindow(gamePath: string, roomId: string) {
-  if (gameWindow && !gameWindow.isDestroyed()) gameWindow.close()
+/**
+ * Открывает локальную панель GTA «Царь горы».
+ * ВАЖНО: панель открывается ДАЖЕ БЕЗ установленной GTA (gamePath=null) —
+ * тогда панель показывает онбординг: поиск/выбор папки, зависимости, установку мода.
+ * roomId может быть пустым (запуск из каталога до создания игровой сессии).
+ */
+function openGtaPanelWindow(gamePath: string | null, roomId: string) {
+  // Если панель уже открыта — фокусируем и обновляем параметры
+  if (gameWindow && !gameWindow.isDestroyed()) {
+    gameWindow.close()
+  }
   gameWindow = new BrowserWindow({
-    width: 640,
-    height: 560,
+    width: 720,
+    height: 720,
+    minWidth: 600,
+    minHeight: 560,
     title: 'Mazlive — Панель GTA (Царь горы)',
     icon: path.join(__dirname, '../assets/icon.png'),
     backgroundColor: '#0d1117',
@@ -414,9 +452,14 @@ function createGtaPanelWindow(gamePath: string, roomId: string) {
   })
   gameWindow.setMenu(null)
   gameWindow.setMenuBarVisibility(false)
-  const q = new URLSearchParams({ gamePath, roomId })
+  const q = new URLSearchParams({ gamePath: gamePath || '', roomId: roomId || '' })
   gameWindow.loadFile(path.join(__dirname, '..', 'renderer', 'gta-panel.html'), { search: '?' + q.toString() })
   gameWindow.on('closed', () => { gameWindow = null })
+}
+
+// Обратная совместимость: старое имя (панель после запуска GTA).
+function createGtaPanelWindow(gamePath: string, roomId: string) {
+  openGtaPanelWindow(gamePath, roomId)
 }
 
 // =============================================================
@@ -508,6 +551,56 @@ ipcMain.handle('gta-agent-stop', () => {
   if (gtaAgent) { gtaAgent.disconnect(); gtaAgent = null }
   gtaState.agentRunning = false
   return { ok: true }
+})
+
+// ─── Открытие локальной панели GTA без установленной игры ───
+// Проверка авторизации/подписки выполняется в renderer (каталог) ДО вызова,
+// здесь дополнительно не блокируем: панель показывает онбординг/настройки.
+ipcMain.handle('gta-open-panel', () => {
+  openGtaPanelWindow(gtaState.gamePath, '')
+  return { ok: true, gamePath: gtaState.gamePath }
+})
+
+// ─── Выбор папки игры через нативный диалог ───
+ipcMain.handle('gta-select-dir', async () => {
+  const res = await dialog.showOpenDialog(mainWindow ?? undefined as any, {
+    title: 'Выберите папку с GTA V (где лежит GTA5.exe)',
+    properties: ['openDirectory'],
+  })
+  if (res.canceled || !res.filePaths.length) return { ok: false }
+  const dir = res.filePaths[0]
+  const hit = findGtaInDir(dir)
+  if (!hit) return { ok: false, error: 'GTA5.exe не найден по этому пути' }
+  gtaState.gamePath = hit.gamePath
+  const deps = checkDependencies(hit.gamePath)
+  const modInstalled = fs.existsSync(path.join(hit.gamePath, 'scripts', 'MazLiveKOTH.dll'))
+  gtaState.modInstalled = modInstalled
+  return { ok: true, gamePath: hit.gamePath, deps, modInstalled }
+})
+
+// ─── Настройки GTA (реакции + раунд/трасса) ───
+ipcMain.handle('gta-settings-get', () => {
+  return { ok: true, settings: gtaSettings.get(), actions: MOD_ACTIONS }
+})
+
+ipcMain.handle('gta-settings-set', (_event, { settings }: { settings: any }) => {
+  const saved = gtaSettings.set(settings || {})
+  // Если мод установлен — сразу применяем курс в settings.ini
+  let applied: string | null = null
+  try { applied = applyCourseSettingsToMod(gtaState.gamePath) } catch { applied = null }
+  return { ok: true, settings: saved, applied }
+})
+
+ipcMain.handle('gta-settings-reset', () => {
+  const saved = gtaSettings.reset()
+  try { applyCourseSettingsToMod(gtaState.gamePath) } catch { /* ignore */ }
+  return { ok: true, settings: saved }
+})
+
+ipcMain.handle('gta-apply-course', (_event, { gamePath }: { gamePath?: string }) => {
+  const gp = gamePath && findGtaInDir(String(gamePath)) ? findGtaInDir(String(gamePath))!.gamePath : gtaState.gamePath
+  const applied = applyCourseSettingsToMod(gp)
+  return { ok: !!applied, applied, gamePath: gp }
 })
 
 ipcMain.handle('close-game', () => {

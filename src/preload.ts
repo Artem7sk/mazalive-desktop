@@ -23,11 +23,19 @@ contextBridge.exposeInMainWorld('mazalive', {
   gta: {
     detect: () => ipcRenderer.invoke('gta-detect'),
     checkPath: (gamePath: string) => ipcRenderer.invoke('gta-check-path', { gamePath }),
+    selectDir: () => ipcRenderer.invoke('gta-select-dir'),
     installMod: (gamePath?: string) => ipcRenderer.invoke('gta-install-mod', { gamePath }),
     uninstallMod: (gamePath?: string) => ipcRenderer.invoke('gta-uninstall-mod', { gamePath }),
     state: () => ipcRenderer.invoke('gta-state'),
     command: (action: string, count = 1) => ipcRenderer.invoke('gta-agent-command', { action, count }),
     stopAgent: () => ipcRenderer.invoke('gta-agent-stop'),
+
+    // Панель без GTA + настройки
+    openPanel: () => ipcRenderer.invoke('gta-open-panel'),
+    settingsGet: () => ipcRenderer.invoke('gta-settings-get'),
+    settingsSet: (settings: any) => ipcRenderer.invoke('gta-settings-set', { settings }),
+    settingsReset: () => ipcRenderer.invoke('gta-settings-reset'),
+    applyCourse: (gamePath?: string) => ipcRenderer.invoke('gta-apply-course', { gamePath }),
 
     onRequired: (cb: (data: any) => void) => ipcRenderer.on('gta-required', (_e, d) => cb(d)),
     onStatus: (cb: (data: any) => void) => ipcRenderer.on('gta-status', (_e, d) => cb(d)),

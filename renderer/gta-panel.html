@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:;"/>
 <title>Mazlive — Панель GTA «Царь горы»</title>
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Syne:wght@400;600;700&display=swap" rel="stylesheet"/>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   :root{
@@ -13,76 +12,330 @@
     --bg:#0d1117;--surface:#161b22;--surface2:#1c2330;--border:#30363d;
     --text:#e6edf3;--muted:#8b949e;--ok:#22c55e;--warn:#f59e0b;--err:#ef4444;
   }
-  body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;padding:18px;min-height:100vh}
-  h1{font-family:'Orbitron';font-size:18px;letter-spacing:1px;background:linear-gradient(90deg,var(--gold),var(--purple));-webkit-background-clip:text;background-clip:text;color:transparent;margin-bottom:4px}
-  .sub{color:var(--muted);font-size:12px;margin-bottom:16px}
-  .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:14px}
+  body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,'Segoe UI',sans-serif;padding:16px;min-height:100vh;font-size:13px}
+  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(168,85,247,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(168,85,247,.03) 1px,transparent 1px);background-size:44px 44px;pointer-events:none}
+  h1{font-size:17px;letter-spacing:.5px;background:linear-gradient(90deg,var(--gold),var(--purple));-webkit-background-clip:text;background-clip:text;color:transparent;margin-bottom:2px}
+  .sub{color:var(--muted);font-size:11px;margin-bottom:14px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px;position:relative}
+  .card h2{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--purple);margin-bottom:10px}
   .row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
   .row:last-child{margin-bottom:0}
-  .label{color:var(--muted);font-size:13px}
-  .val{font-size:13px;font-weight:700}
-  .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle}
+  .label{color:var(--muted);font-size:12px}
+  .val{font-size:12px;font-weight:600;text-align:right;word-break:break-all;max-width:60%}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle;flex:0 0 auto}
   .dot.ok{background:var(--ok);box-shadow:0 0 8px var(--ok)}
   .dot.warn{background:var(--warn);box-shadow:0 0 8px var(--warn)}
   .dot.err{background:var(--err);box-shadow:0 0 8px var(--err)}
   .dot.idle{background:var(--muted)}
-  .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-  button{background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-family:'Syne';font-size:13px;font-weight:600;cursor:pointer;transition:.15s}
+  .grid{display:grid;gap:8px}
+  button{background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:9px;padding:9px 12px;font-size:12px;font-weight:600;cursor:pointer;transition:.15s;font-family:inherit}
   button:hover{border-color:var(--purple);background:#21293a}
-  button.primary{background:linear-gradient(135deg,var(--purple),var(--blue));border:none}
+  button.primary{background:linear-gradient(135deg,var(--purple),var(--blue));border:none;color:#fff}
   button.danger{border-color:#7f1d1d;color:#fca5a5}
-  .stat{background:var(--surface2);border-radius:10px;padding:8px 10px;text-align:center}
-  .stat .n{font-family:'Orbitron';font-size:20px;font-weight:900;color:var(--cyan)}
-  .stat .t{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
-  .log{background:#0a0d13;border-radius:8px;padding:8px;height:110px;overflow-y:auto;font-family:monospace;font-size:11px;color:var(--muted);line-height:1.5}
-  .progress{height:8px;background:var(--surface2);border-radius:4px;overflow:hidden;margin-top:6px}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  .stat{background:var(--surface2);border-radius:9px;padding:8px;text-align:center}
+  .stat .n{font-size:19px;font-weight:800;color:var(--cyan)}
+  .stat .t{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  .log{background:#0a0d13;border-radius:8px;padding:8px;height:130px;overflow-y:auto;font-family:ui-monospace,monospace;font-size:11px;color:var(--muted);line-height:1.5}
+  .progress{height:7px;background:var(--surface2);border-radius:4px;overflow:hidden;margin-top:6px}
   .progress>i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--cyan),var(--purple));transition:width .3s}
+  input,select{background:#0a0d13;border:1px solid var(--border);border-radius:8px;color:var(--text);padding:7px 9px;font-size:12px;font-family:inherit;width:100%}
+  input:focus,select:focus{outline:none;border-color:var(--purple)}
+  .field{margin-bottom:8px}
+  .field .label{display:block;margin-bottom:4px}
+  .inline{display:flex;gap:8px;align-items:flex-end}
+  .inline>.field{flex:1;margin-bottom:0}
+  .hidden{display:none!important}
+  .banner{background:linear-gradient(135deg,rgba(168,85,247,.12),rgba(59,130,246,.12));border:1px solid rgba(168,85,247,.35);border-radius:10px;padding:11px;font-size:12px;margin-bottom:10px;line-height:1.5}
+  .banner.warn{background:rgba(245,158,11,.1);border-color:rgba(245,158,11,.4)}
+  .banner.err{background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.4)}
+  .tags{display:flex;gap:5px;flex-wrap:wrap}
+  .tag{font-size:10px;padding:3px 7px;border-radius:99px;border:1px solid var(--border);color:var(--muted)}
+  .tag.ok{border-color:rgba(34,197,94,.4);color:#4ade80}
+  .tag.bad{border-color:rgba(239,68,68,.4);color:#f87171}
+  .rule{display:grid;grid-template-columns:1.4fr 1fr 1.4fr .8fr auto;gap:6px;align-items:center;margin-bottom:6px}
+  .rule input,.rule select{padding:6px 8px}
+  .rule button{padding:6px 9px}
+  .small{font-size:11px;color:var(--muted)}
+  hr{border:none;border-top:1px solid var(--border);margin:10px 0}
 </style>
 </head>
 <body>
   <h1>🏔️ GTA V — ЦАРЬ ГОРЫ</h1>
-  <div class="sub">Локальная панель управления · Mazlive Desktop 2.0</div>
+  <div class="sub">Локальная панель управления · Mazlive Desktop 2.0 Beta</div>
 
+  <!-- ЭКРАН 1: ОНБОРДИНГ / УСТАНОВКА -->
+  <div id="setup">
+    <div id="setupBanner" class="banner">Проверяем GTA V Legacy на этом компьютере…</div>
+
+    <div class="card">
+      <h2>1 · Папка игры</h2>
+      <div class="row">
+        <span class="label">Путь</span>
+        <span class="val" id="vPath">—</span>
+      </div>
+      <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:8px">
+        <button id="bAuto">🔍 Найти автоматически</button>
+        <button id="bPick">📁 Выбрать папку…</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>2 · Зависимости</h2>
+      <div class="tags" id="depsTags">
+        <span class="tag">GTA5.exe</span>
+        <span class="tag">ScriptHookV</span>
+        <span class="tag">ScriptHookVDotNet</span>
+      </div>
+      <div class="small" id="depsHint" style="margin-top:8px">Выберите папку игры, чтобы проверить зависимости.</div>
+    </div>
+
+    <div class="card">
+      <h2>3 · Мод MazLiveKOTH</h2>
+      <div class="row">
+        <span class="label"><span id="dotMod" class="dot idle"></span>Статус мода</span>
+        <span class="val" id="vModSetup">—</span>
+      </div>
+      <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:8px">
+        <button class="primary" id="bInstall">⬇️ Установить мод</button>
+        <button class="danger" id="bUninstall">🗑 Удалить мод</button>
+      </div>
+      <div class="small" style="margin-top:8px">Мод только для Story Mode (GTA Online не используется). Перед установкой закройте GTA.</div>
+    </div>
+  </div>
+
+  <!-- ЭКРАН 2: РАБОЧАЯ ПАНЕЛЬ -->
+  <div id="main" class="hidden">
+    <div class="card">
+      <div class="row"><span class="label"><span id="dotConn" class="dot idle"></span>Соединение с MazLive</span><span class="val" id="vConn">—</span></div>
+      <div class="row"><span class="label"><span id="dotStream" class="dot idle"></span>Эфир</span><span class="val" id="vStream">—</span></div>
+      <div class="row"><span class="label"><span id="dotMod2" class="dot idle"></span>Мод</span><span class="val" id="vMod">—</span></div>
+      <div class="row"><span class="label"><span id="dotPhase" class="dot idle"></span>Раунд</span><span class="val" id="vPhase">—</span></div>
+      <div class="progress"><i id="prog"></i></div>
+    </div>
+
+    <div class="card">
+      <div class="grid" style="grid-template-columns:repeat(4,1fr)">
+        <div class="stat"><div class="n" id="sWin">0</div><div class="t">Победы</div></div>
+        <div class="stat"><div class="n" id="sFall">0</div><div class="t">Падения</div></div>
+        <div class="stat"><div class="n" id="sObj">0</div><div class="t">Объекты</div></div>
+        <div class="stat"><div class="n" id="sQueue">0</div><div class="t">Очередь</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Управление эфиром (стример)</h2>
+      <div class="grid" style="grid-template-columns:1fr 1fr">
+        <button class="primary" id="bRun">▶ Запустить GTA + эфир</button>
+        <button id="bStopAll">⏹ Остановить</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Управление раундом</h2>
+      <div class="grid" style="grid-template-columns:repeat(4,1fr)">
+        <button class="primary" id="cStart">▶ Старт</button>
+        <button id="cStop">⏹ Стоп</button>
+        <button id="cClear">🧹 Очистить</button>
+        <button id="cReset">↺ Сброс</button>
+      </div>
+      <hr/>
+      <div class="label" style="margin-bottom:6px">Тестовое действие зрителя (проверка правил/реакций)</div>
+      <div class="inline">
+        <div class="field">
+          <select id="testAction">
+            <option value="car">car</option><option value="truck">truck</option>
+            <option value="tank">tank</option><option value="crate">crate</option>
+            <option value="shield">shield</option><option value="boost">boost</option>
+            <option value="checkpoint">checkpoint</option>
+          </select>
+        </div>
+        <div class="field" style="max-width:90px"><input id="testCount" type="number" min="1" max="12" value="1"/></div>
+        <button class="primary" id="bTest">▶ Отправить</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- НАСТРОЙКИ РЕАКЦИЙ + РАУНДА (доступны всегда) -->
   <div class="card">
-    <div class="row"><span class="label"><span id="dotConn" class="dot idle"></span>Соединение с MazLive</span><span class="val" id="vConn">—</span></div>
-    <div class="row"><span class="label"><span id="dotStream" class="dot idle"></span>Эфир</span><span class="val" id="vStream">—</span></div>
-    <div class="row"><span class="label"><span id="dotMod" class="dot idle"></span>Мод</span><span class="val" id="vMod">—</span></div>
-    <div class="row"><span class="label"><span id="dotPhase" class="dot idle"></span>Раунд</span><span class="val" id="vPhase">—</span></div>
-    <div class="progress"><i id="prog"></i></div>
+    <h2>Настройки реакций (подарки · лайки · follow)</h2>
+    <div class="inline" style="margin-bottom:8px">
+      <div class="field"><label class="label">Лайков на boost</label><input id="sLikes" type="number" min="1"/></div>
+      <div class="field"><label class="label">Follow → действие</label><select id="sFollow"></select></div>
+    </div>
+    <div class="inline" style="margin-bottom:8px">
+      <div class="field"><label class="label">Подарок по умолчанию</label><select id="sDefGift"></select></div>
+      <div class="field"><label class="label">Монет на действие</label><input id="sCoins" type="number" min="1"/></div>
+      <div class="field"><label class="label">Макс. за событие</label><input id="sMax" type="number" min="1" max="12"/></div>
+    </div>
+    <div class="label" style="margin:10px 0 6px">Правила подарков</div>
+    <div id="rules"></div>
+    <button id="bAddRule" style="margin-top:4px">+ Добавить правило</button>
   </div>
 
   <div class="card">
-    <div class="grid" style="grid-template-columns:repeat(4,1fr)">
-      <div class="stat"><div class="n" id="sWin">0</div><div class="t">Победы</div></div>
-      <div class="stat"><div class="n" id="sFall">0</div><div class="t">Паления</div></div>
-      <div class="stat"><div class="n" id="sObj">0</div><div class="t">Объекты</div></div>
-      <div class="stat"><div class="n" id="sQueue">0</div><div class="t">Очередь</div></div>
+    <h2>Настройки раунда и трассы</h2>
+    <div class="inline" style="margin-bottom:8px">
+      <div class="field"><label class="label">Угол трассы (8–28°)</label><input id="cAngle" type="number" min="8" max="28"/></div>
+      <div class="field"><label class="label">Сегменты (6–24)</label><input id="cSeg" type="number" min="6" max="24"/></div>
+      <div class="field"><label class="label">Длительность раунда, сек</label><input id="cSec" type="number" min="30" max="3600"/></div>
+    </div>
+    <div class="small" style="margin-bottom:8px">Применяется к моду рестартом трассы (F10/F7 в GTA).</div>
+    <div class="grid" style="grid-template-columns:1fr 1fr 1fr">
+      <button class="primary" id="bSave">💾 Сохранить</button>
+      <button id="bApply">⚙️ Применить к моду</button>
+      <button id="bResetSet">↺ Сброс настроек</button>
     </div>
   </div>
 
   <div class="card">
-    <div class="label" style="margin-bottom:8px">Управление (для стримера)</div>
-    <div class="grid" style="grid-template-columns:1fr 1fr 1fr 1fr">
-      <button class="primary" id="bStart">▶ Старт</button>
-      <button id="bStop">⏹ Стоп</button>
-      <button id="bClear">🧹 Очистить</button>
-      <button id="bReset">↺ Сброс</button>
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="label" style="margin-bottom:8px">Журнал</div>
+    <h2>Журнал</h2>
     <div class="log" id="log"></div>
   </div>
 
 <script>
   const q = new URLSearchParams(location.search)
-  const roomId = q.get('roomId') || ''
   const api = window.mazalive && window.mazalive.gta
   const $ = (id) => document.getElementById(id)
-  function log(msg){ const l=$('log'); l.innerHTML += '<div>'+new Date().toLocaleTimeString()+' · '+msg+'</div>'; l.scrollTop=l.scrollHeight }
-  function dot(el, cls){ el.className='dot '+cls }
+  let actions = ['car','truck','tank','crate','shield','boost','checkpoint']
+  let gamePath = q.get('gamePath') || ''
+  let roomId = q.get('roomId') || ''
+  let modInstalled = false
+  let courseDirty = false
 
+  function log(msg){ const l=$('log'); l.innerHTML += '<div>'+new Date().toLocaleTimeString()+' · '+msg+'</div>'; l.scrollTop=l.scrollHeight }
+  function dot(el, cls){ if(el) el.className='dot '+cls }
+
+  function fillActionSelects(){
+    const follow = $('sFollow'), def = $('sDefGift')
+    for(const a of actions){ follow.appendChild(new Option(a,a)); def.appendChild(new Option(a,a)) }
+  }
+
+  function renderRules(rules){
+    const box = $('rules'); box.innerHTML = ''
+    rules.forEach((r, i) => {
+      const row = document.createElement('div'); row.className = 'rule'
+      row.innerHTML = `
+        <input data-k="name" placeholder="Название/ID подарка" value="${(r.name||'').replace(/"/g,'&quot;')}"/>
+        <input data-k="id" placeholder="giftId (опц.)" value="${(r.id||'').replace(/"/g,'&quot;')}"/>
+        <select data-k="action">${actions.map(a=>`<option ${a===r.action?'selected':''}>${a}</option>`).join('')}</select>
+        <input data-k="coinsPerAction" type="number" min="1" value="${r.coinsPerAction||1}"/>
+        <button class="danger" data-del="${i}">✕</button>`
+      box.appendChild(row)
+    })
+    box.querySelectorAll('button[data-del]').forEach(b=>b.onclick=()=>{
+      const cur = collectRules(); cur.splice(Number(b.dataset.del),1); renderRules(cur); courseDirty=true
+    })
+  }
+  function collectRules(){
+    return [...$('rules').querySelectorAll('.rule')].map(row=>{
+      const g = k => row.querySelector(`[data-k="${k}"]`).value
+      return { name:g('name').trim(), id:(g('id')||'').trim()||undefined, action:g('action'), coinsPerAction:Number(g('coinsPerAction'))||1 }
+    }).filter(r=>r.name||r.id)
+  }
+
+  async function loadSettings(){
+    if(!api) return
+    const res = await api.settingsGet()
+    if(res && res.actions && res.actions.length){ actions = res.actions.filter(a=>['car','truck','tank','crate','shield','boost','checkpoint'].includes(a)); }
+    fillActionSelects()
+    const s = res.settings
+    $('sLikes').value = s.reactions.likesPerBoost
+    $('sFollow').value = s.reactions.followAction
+    $('sDefGift').value = s.reactions.defaultGiftAction
+    $('sCoins').value = s.reactions.coinsPerAction
+    $('sMax').value = s.reactions.maxPerEvent
+    renderRules(s.reactions.giftRules || [])
+    $('cAngle').value = s.course.angle
+    $('cSeg').value = s.course.segments
+    $('cSec').value = s.course.roundSeconds
+  }
+
+  function getSettingsPayload(){
+    return {
+      reactions: {
+        likesPerBoost: Number($('sLikes').value)||100,
+        followAction: $('sFollow').value,
+        defaultGiftAction: $('sDefGift').value,
+        coinsPerAction: Number($('sCoins').value)||10,
+        maxPerEvent: Number($('sMax').value)||12,
+        giftRules: collectRules(),
+      },
+      course: {
+        angle: Number($('cAngle').value)||18,
+        segments: Number($('cSeg').value)||14,
+        roundSeconds: Number($('cSec').value)||300,
+      },
+    }
+  }
+
+  function updateDeps(deps){
+    const map = { 'GTA5.exe':'gameExe', 'ScriptHookV':'scriptHookV', 'ScriptHookVDotNet':'scriptHookVDotNet' }
+    const tags = $('depsTags').children
+    let i = 0
+    for(const [label, key] of Object.entries(map)){
+      const ok = deps && deps.details && deps.details[key]
+      tags[i].className = 'tag ' + (ok ? 'ok' : 'bad')
+      tags[i].textContent = (ok?'✔ ':'✖ ') + label
+      i++
+    }
+    if(deps) $('depsHint').textContent = deps.ok ? 'Все зависимости на месте.' : ('Отсутствует: ' + (deps.missing||[]).join(', '))
+  }
+
+  function setModState(installed){
+    modInstalled = installed
+    dot($('dotMod'), installed?'ok':'err')
+    dot($('dotMod2'), installed?'ok':'err')
+    $('vModSetup').textContent = installed ? 'установлен' : 'не установлен'
+    $('bInstall').disabled = installed
+    $('bUninstall').disabled = !installed
+    $('bRun').disabled = !installed
+  }
+
+  function showSetup(msg, cls){
+    const b = $('setupBanner')
+    b.className = 'banner' + (cls?' '+cls:'')
+    b.innerHTML = msg
+  }
+
+  async function refreshSetup(){
+    if(!api) { showSetup('API недоступен — приложение запущено не в Electron.', 'err'); return }
+    // 1) известный путь из параметров
+    if(gamePath){
+      const r = await api.checkPath(gamePath)
+      if(r.ok){ gamePath = r.gamePath; $('vPath').textContent = gamePath; updateDeps(r.deps); setModState(r.modInstalled); showSetup('GTA найдена. Проверьте зависимости и мод.', '') ; return }
+    }
+    // 2) автоопределение
+    const auto = await api.detect()
+    if(auto.found){ gamePath = auto.gamePath; $('vPath').textContent = gamePath; updateDeps(auto.deps); setModState(auto.modInstalled); showSetup('GTA найдена автоматически.', ''); }
+    else { $('vPath').textContent = 'не найдена'; showSetup('GTA V Legacy не найдена. Укажите папку игры вручную (кнопка ниже).', 'warn'); setModState(false) }
+  }
+
+  async function detect(){ const r = await api.detect(); if(r.found){ gamePath=r.gamePath; $('vPath').textContent=gamePath; updateDeps(r.deps); setModState(r.modInstalled); showSetup('GTA найдена.', '') } else showSetup('Не найдена автоматически. Выберите папку вручную.', 'warn') }
+  async function pick(){ const r = await api.selectDir(); if(r.ok){ gamePath=r.gamePath; $('vPath').textContent=gamePath; updateDeps(r.deps); setModState(r.modInstalled); showSetup('Папка принята.','') } else if(r.error){ showSetup(r.error,'err') } }
+  async function install(){ try{ log('установка мода…'); await api.installMod(gamePath||undefined); setModState(true); log('мод установлен ✓'); await api.applyCourse(gamePath); }catch(e){ log('ошибка установки: '+e.message); showSetup('Не удалось установить мод: '+e.message, 'err') } }
+  async function uninstall(){ try{ log('удаление мода…'); await api.uninstallMod(gamePath||undefined); setModState(false); log('мод удалён') }catch(e){ log('ошибка удаления: '+e.message) } }
+
+  // Управление эфиром/раундом
+  async function run(){ log('запуск GTA и эфира…'); try{ if(roomId){ await api.launchGame ? null : null } }catch(e){}
+    // Запуск GTA+агент делает main через gta-run; здесь — через launch-game маршрут уже отработал при входе из каталога.
+    log('для запуска GTA используйте каталог (карточка → Запустить). Панель остаётся открытой.') }
+  async function stopAll(){ try{ await api.stopAgent(); log('агент остановлен') }catch(e){ log('stop: '+e.message) } }
+  const ctrl=(action)=>api.command(action,1).then(()=>log('команда: '+action)).catch(e=>log('ошибка: '+e.message))
+  async function testAction(){ try{ const a=$('testAction').value, n=Number($('testCount').value)||1; await api.command(a,n); log('тест: '+a+' ×'+n) }catch(e){ log('тест: ошибка — '+e.message) } }
+
+  async function saveSettings(){ const res = await api.settingsSet(getSettingsPayload()); await loadSettings(); log('настройки сохранены ✓'+(res.applied?(' · ini: '+res.applied):'')) }
+  async function applyCourse(){ const res = await api.applyCourse(gamePath||undefined); if(res.ok) log('курс применён к моду: '+res.applied); else log('курс не применён (мод не установлен?)') }
+  async function resetSettings(){ await api.settingsReset(); await loadSettings(); log('настройки сброшены к дефолту') }
+
+  // События мода
+  if(api){
+    api.onAgentStatus(d=>log('агент: '+(d.message||d.kind)))
+    api.onStatus(d=>log('мод: '+(d.message||d.kind)))
+    api.onCommand(d=>log('→ '+d.action+' ×'+d.count+' от '+d.name))
+    api.onAck(d=>log('✓ '+d.action+' — '+(d.outcome||'ok')))
+    api.onRequired(d=>log('⚠️ '+(d.message||d.stage)))
+  }
   async function refresh(){
     if(!api) return
     try{
@@ -90,28 +343,36 @@
       const a = st.agent || {}
       dot($('dotConn'), a.connected?'ok':'err'); $('vConn').textContent = a.connected?'подключено':'нет'
       dot($('dotStream'), a.streamLive?'ok':'warn'); $('vStream').textContent = a.streamLive?'LIVE':'ожидание'
-      dot($('dotMod'), a.modOnline?'ok':'err'); $('vMod').textContent = a.modOnline?('v'+(a.mod&&a.mod.version||'')):(a.modError||'офлайн')
-      const phase = a.mod && a.mod.phase || '—'
-      dot($('dotPhase'), phase==='running'?'ok':phase==='error'?'err':'idle'); $('vPhase').textContent = phase
       const m = a.mod||{}
       $('sWin').textContent=m.wins??0; $('sFall').textContent=m.falls??0
       $('sObj').textContent=m.objects??0; $('sQueue').textContent=m.queue??0
       $('prog').style.width = ((m.progress??0)*100)+'%'
+      const phase = m.phase || '—'
+      dot($('dotPhase'), phase==='running'?'ok':phase==='error'?'err':'idle'); $('vPhase').textContent = phase
     }catch(e){}
   }
 
-  if(api){
-    api.onAgentStatus(d=>log('агент: '+d.message))
-    api.onStatus(d=>log('мод: '+d.message))
-    api.onCommand(d=>log('→ '+d.action+' ×'+d.count+' от '+d.name))
-    api.onAck(d=>log('✓ '+d.action+' — '+(d.outcome||'ok')))
-    api.onRequired(d=>log('⚠️ '+(d.message||d.stage)))
-  }
-  const ctrl=(action)=>api&&api.command(action,1).then(()=>log('команда: '+action)).catch(e=>log('ошибка: '+e.message))
-  $('bStart').onclick=()=>ctrl('start'); $('bStop').onclick=()=>ctrl('stop')
-  $('bClear').onclick=()=>ctrl('clear'); $('bReset').onclick=()=>ctrl('reset')
+  // Обработчики
+  $('bAuto').onclick = detect
+  $('bPick').onclick = pick
+  $('bInstall').onclick = install
+  $('bUninstall').onclick = uninstall
+  $('bRun').onclick = run
+  $('bStopAll').onclick = stopAll
+  $('cStart').onclick = ()=>ctrl('start'); $('cStop').onclick = ()=>ctrl('stop')
+  $('cClear').onclick = ()=>ctrl('clear'); $('cReset').onclick = ()=>ctrl('reset')
+  $('bTest').onclick = testAction
+  $('bSave').onclick = saveSettings
+  $('bApply').onclick = applyCourse
+  $('bResetSet').onclick = resetSettings
+  $('bAddRule').onclick = ()=>{ const cur=collectRules(); cur.push({name:'',action:actions[0]||'car',coinsPerAction:1}); renderRules(cur) }
 
-  setInterval(refresh, 1000); refresh()
+  ;(async()=>{
+    if(roomId){ $('setup').classList.add('hidden'); $('main').classList.remove('hidden') }
+    await loadSettings()
+    await refreshSetup()
+    setInterval(refresh, 1000); refresh()
+  })()
 </script>
 </body>
 </html>

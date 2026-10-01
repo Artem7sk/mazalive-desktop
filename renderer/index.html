@@ -149,6 +149,7 @@ const GAMES = [
   {slug:'prediction',name:'Предсказания',desc:'Ставки на исход событий',emoji:'🔮',isPro:true},
   {slug:'vote',name:'Голосование',desc:'Зрители голосуют за действие',emoji:'🗳️',isPro:true},
   {slug:'gifts-race',name:'Гонка Подарков',desc:'Кто пришлёт больше подарков',emoji:'🎁',isPro:true},
+  {slug:'gta-koth',name:'GTA V — Царь горы',desc:'Локальная игра: подарки/лайки/follow управляют боем в GTA V (Story Mode)',emoji:'🏔️',isPro:true,desktop:true},
 ]
 
 let currentUser = null
@@ -229,6 +230,24 @@ async function launchGame(gameSlug) {
   const btn = document.getElementById(`btn-${gameSlug}`)
   const card = document.getElementById(`card-${gameSlug}`)
   if (!btn) return
+
+  const game = GAMES.find(g => g.slug === gameSlug)
+
+  // Desktop-игры (GTA): открываем локальную панель настройки/управления,
+  // даже если игра ещё не установлена. Проверка авторизации/подписки — выше (canPlay).
+  if (game && game.desktop) {
+    btn.disabled = true
+    btn.textContent = '⟳ Открываем…'
+    try {
+      await api.gta.openPanel()
+      showToast('Панель GTA открыта', 'success')
+    } catch (e) {
+      showToast('Ошибка открытия панели: ' + (e.message || 'попробуй снова'), 'error')
+    } finally {
+      setTimeout(() => { if (btn) { btn.disabled = false; btn.textContent = '▶ Запуск' } }, 1200)
+    }
+    return
+  }
 
   btn.disabled = true
   btn.textContent = '⟳ Запуск...'
