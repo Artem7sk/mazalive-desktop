@@ -16,16 +16,6 @@ contextBridge.exposeInMainWorld('mazalive', {
     ipcRenderer.on('game-launched', (_e, data) => cb(data)),
   onUpdateProgress: (cb: (data: { percent: number }) => void) =>
     ipcRenderer.on('update-progress', (_e, data) => cb(data)),
-  // ─── Updater UI (beta.15): доступно обновление / прогресс / готово / ошибка ───
-  onUpdateAvailable: (cb: (data: { version: string; releaseDate?: string }) => void) =>
-    ipcRenderer.on('update-available', (_e, data) => cb(data)),
-  onUpdateDownloaded: (cb: (data: { version: string }) => void) =>
-    ipcRenderer.on('update-downloaded', (_e, data) => cb(data)),
-  onUpdateError: (cb: (data: { message: string }) => void) =>
-    ipcRenderer.on('update-error', (_e, data) => cb(data)),
-  downloadUpdate: () => ipcRenderer.invoke('update-download'),
-  installUpdate: () => ipcRenderer.invoke('update-install'),
-  checkUpdatesManual: () => ipcRenderer.invoke('check-updates'),
   onError: (cb: (data: { message: string }) => void) =>
     ipcRenderer.on('error', (_e, data) => cb(data)),
 
@@ -39,7 +29,6 @@ contextBridge.exposeInMainWorld('mazalive', {
     state: () => ipcRenderer.invoke('gta-state'),
     command: (action: string, count = 1) => ipcRenderer.invoke('gta-agent-command', { action, count }),
     testEvent: (evt: any) => ipcRenderer.invoke('gta-test-event', { evt }),
-    startAgent: (username?: string) => ipcRenderer.invoke('gta-agent-start', { username }),
     stopAgent: () => ipcRenderer.invoke('gta-agent-stop'),
     connectStream: (username?: string, gamePath?: string) => ipcRenderer.invoke('gta-connect-stream', { username, gamePath }),
     getUsername: () => ipcRenderer.invoke('gta-get-username'),

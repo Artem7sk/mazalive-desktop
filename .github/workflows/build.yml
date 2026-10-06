@@ -43,8 +43,16 @@ jobs:
           path: |
             dist/*.exe
             dist/*.exe.blockmap
+            dist/beta.yml
+            dist/alpha.yml
             dist/latest.yml
-          if-no-files-found: warn
+          if-no-files-found: error
+      - name: Show updater metadata (beta.yml/alpha.yml)
+        shell: pwsh
+        run: |
+          foreach ($f in @("dist\beta.yml","dist\alpha.yml","dist\latest.yml")) {
+            if (Test-Path $f) { Write-Host "=== $f ==="; Get-Content $f } else { Write-Host "(нет $f)" }
+          }
 
   build-mac:
     runs-on: macos-latest
@@ -64,5 +72,7 @@ jobs:
           path: |
             dist/*.zip
             dist/*.dmg
+            dist/beta-mac.yml
+            dist/alpha-mac.yml
             dist/latest-mac.yml
-          if-no-files-found: warn
+          if-no-files-found: error

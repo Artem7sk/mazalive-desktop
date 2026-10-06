@@ -62,19 +62,7 @@ let gtaState: {
   agentRunning: boolean
   lastStatus: string
   lastError: string | null
-  agentPid: number | null
-  agentError: string | null
-  streamConnected: boolean
-} = {
-  gamePath: null,
-  modInstalled: false,
-  agentRunning: false,
-  lastStatus: 'idle',
-  lastError: null,
-  agentPid: null,
-  agentError: null,
-  streamConnected: false,
-}
+} = { gamePath: null, modInstalled: false, agentRunning: false, lastStatus: 'idle', lastError: null }
 
 // Папка с упакованными ресурсами мода (в prod — resources/mod, в dev — ./mod)
 function modSourceDir(): string {
@@ -479,14 +467,9 @@ async function startAgent(gamePath: string, roomId: string, roomToken: string, u
     serverUrl: GAME_SERVER_SOCKET_URL,
   }).then(() => {
     gtaState.agentRunning = true
-    gtaState.agentError = null
-    gtaState.agentPid = (gtaAgent && typeof gtaAgent.pid === 'number') ? gtaAgent.pid : process.pid
-    gtaState.streamConnected = !!gtaAgent?.streamLive
-    sendToMain('gta-agent-status', { kind: 'agent_started', message: 'Агент запущен', pid: gtaState.agentPid })
+    sendToMain('gta-agent-status', { kind: 'agent_started', message: 'Агент запущен' })
   }).catch((e: any) => {
-    gtaState.agentRunning = false
-    gtaState.agentError = e?.message || 'неизвестная ошибка'
-    sendToMain('gta-agent-status', { kind: 'error', message: 'Ошибка агента: ' + (e?.message || '') })
+    sendToMain('gta-agent-status', { kind: 'error', message: 'Ошибка агента: ' + e.message })
   })
 
   // Токен живёт 15 мин → обновляем каждые 12 мин, иначе /streamer отвалится.
@@ -517,39 +500,6 @@ function openGtaPanelWindow(gamePath: string | null, roomId: string, roomToken =
   // roomToken передаём в панель отдельным query-параметром (живёт только в памяти окна).
   const q = new URLSearchParams({ gamePath: gamePath || '', roomId: roomId || '', roomToken: roomToken || '' })
   w.loadFile(path.join(__dirname, '..', 'renderer', 'gta-panel.html'), { search: '?' + q.toString() })
-}
-
-/**
- * Автозапуск GTA Agent при открытии панели (beta.15).
- * Запускаем ТОЛЬКО если: найдена GTA, установлен мод, есть ник эфира.
- * Защита от второго экземпляра — внутри gta-agent-start (проверка gtaState.agentRunning).
- * Ошибки НЕ показываем модалками — только тихий лог (пользователь увидит кнопку «Запустить агент»).
- */
-async function tryAutoStartAgent(): Promise<void> {
-  try {
-    if (gtaAgent && gtaState.agentRunning) return
-    const gp = gtaState.gamePath || autoDetectGta()?.gamePath || null
-    if (!gp || !findGtaInDir(gp)) return
-    gtaState.gamePath = gp
-    const modOk = fs.existsSync(path.join(gp, 'scripts', 'MazLiveKOTH.dll'))
-    gtaState.modInstalled = modOk
-    if (!modOk) return
-    const room = String((await getTikTokUsername()) || '').replace('@', '').trim().toLowerCase()
-    if (!room) return
-    const token = await resolveToken()
-    if (!token) return
-    const res = await axios.get(`${WEB_URL}/api/auth/verify-subscription`, {
-      headers: { Authorization: `Bearer ${token}` }, timeout: 15000,
-    })
-    if (!(res.data?.valid && res.data?.plan === 'pro')) return
-    sendToMain('gta-agent-status', { kind: 'agent_starting', message: 'Запуск GTA Agent…' })
-    await startAgent(gp, room, res.data?.roomToken || '', { name: room })
-    console.log('[beta.15] GTA Agent авто-запущен, комната:', room)
-  } catch (e: any) {
-    // Автозапуск не удался — оставляем кнопку «Запустить агент» в UI и лог
-    gtaState.agentError = e?.message || 'неизвестная ошибка'
-    console.log('[beta.15] Автозапуск GTA Agent не удался:', gtaState.agentError)
-  }
 }
 
 /** Вернуться из панели мода в кабинет (главное окно). */
@@ -657,90 +607,23 @@ ipcMain.handle('gta-uninstall-mod', async (_event, { gamePath }: { gamePath: str
 ipcMain.handle('gta-state', () => {
   let mod: any = null
   if (gtaAgent) { try { mod = gtaAgent.state() } catch (e: any) { mod = { error: e.message } } }
-  // Обновляем живые флаги из агента (если он есть)
-  if (gtaAgent) {
-    try { gtaState.agentRunning = true; gtaState.streamConnected = !!gtaAgent.streamLive } catch {}
-  } else {
-    gtaState.agentRunning = false
-    gtaState.streamConnected = false
-  }
-  // Проверяем существование пути/мода на диске (для актуального Wizard-статуса)
-  let gtaFound = false
-  let deps: any = null
-  if (gtaState.gamePath && findGtaInDir(gtaState.gamePath)) {
-    gtaFound = true
-    try { deps = checkDependencies(gtaState.gamePath) } catch {}
-    gtaState.modInstalled = fs.existsSync(path.join(gtaState.gamePath, 'scripts', 'MazLiveKOTH.dll'))
-  }
-  return {
-    ...gtaState,
-    gtaFound,
-    deps,
-    agent: mod,
-  }
+  return { ...gtaState, agent: mod }
 })
 
 ipcMain.handle('gta-agent-command', (_event, { action, count = 1 }: { action: string; count?: number }) => {
-  if (!gtaAgent) throw new Error('GTA Agent не запущен. Нажмите «Запустить агент».')
+  if (!gtaAgent) throw new Error('Агент не запущен')
   return gtaAgent.control(action, { count, name: 'Streamer' })
 })
 
 ipcMain.handle('gta-test-event', (_event, { evt }: { evt: any }) => {
-  if (!gtaAgent) throw new Error('GTA Agent не запущен. Нажмите «Запустить агент».')
+  if (!gtaAgent) throw new Error('Агент не запущен — сначала «Подключить эфир»')
   return gtaAgent.simulate(evt)
 })
 
 ipcMain.handle('gta-agent-stop', () => {
-  if (gtaAgent) { try { gtaAgent.disconnect() } catch {}; gtaAgent = null }
-  if (gtaRefreshTimer) { clearInterval(gtaRefreshTimer); gtaRefreshTimer = null }
+  if (gtaAgent) { gtaAgent.disconnect(); gtaAgent = null }
   gtaState.agentRunning = false
-  gtaState.agentPid = null
-  gtaState.streamConnected = false
   return { ok: true }
-})
-
-// ─── Ручной старт агента из панели (без запуска GTA) ───
-// Требует: найдена GTA, установлен мод, есть PRO-подписка и ник эфира.
-ipcMain.handle('gta-agent-start', async (_e, { username }: { username?: string } = {}) => {
-  try {
-    // 1) Путь к GTA
-    const gp = gtaState.gamePath || autoDetectGta()?.gamePath || null
-    if (!gp || !findGtaInDir(gp)) return { ok: false, reason: 'gta-missing', error: 'GTA V Legacy не найдена' }
-    gtaState.gamePath = gp
-    // 2) Мод
-    const modOk = fs.existsSync(path.join(gp, 'scripts', 'MazLiveKOTH.dll'))
-    gtaState.modInstalled = modOk
-    if (!modOk) return { ok: false, reason: 'mod-missing', error: 'Мод MazLiveKOTH не установлен' }
-    // 3) Подписка
-    const token = await resolveToken()
-    if (!token) return { ok: false, reason: 'auth', error: 'Нужно войти в аккаунт' }
-    let roomToken = ''
-    try {
-      const res = await axios.get(`${WEB_URL}/api/auth/verify-subscription`, {
-        headers: { Authorization: `Bearer ${token}` }, timeout: 15000,
-      })
-      if (!(res.data?.valid && res.data?.plan === 'pro')) return { ok: false, reason: 'subscription', error: 'Нужна PRO-подписка' }
-      roomToken = res.data?.roomToken || ''
-    } catch (err: any) {
-      if (err?.response?.status === 401) { tokenStore.clear(); return { ok: false, reason: 'auth', error: 'Сессия истекла — войдите снова' } }
-      if (err?.response?.status === 403) return { ok: false, reason: 'subscription', error: 'Нужна PRO-подписка' }
-      return { ok: false, reason: 'error', error: 'Не удалось проверить подписку' }
-    }
-    // 4) Ник эфира
-    const room = String(username || (await getTikTokUsername()) || '').replace('@', '').trim().toLowerCase()
-    if (!room) return { ok: false, reason: 'no_username', error: 'Не указан ник TikTok (эфир)' }
-    // 5) Уже запущен? (защита от второго экземпляра)
-    if (gtaAgent && gtaState.agentRunning) {
-      return { ok: true, already: true, room, pid: gtaState.agentPid }
-    }
-    await startAgent(gp, room, roomToken, { name: room })
-    // Запоминаем ник
-    try { await session.defaultSession.cookies.set({ url: WEB_URL, name: 'tiktok_username', value: room, path: '/' }) } catch {}
-    return { ok: true, room, pid: gtaState.agentPid }
-  } catch (err: any) {
-    gtaState.agentError = err?.message || 'неизвестная ошибка'
-    return { ok: false, reason: 'error', error: 'GTA Agent не удалось запустить: ' + (err?.message || '') }
-  }
 })
 
 ipcMain.handle('gta-get-username', async () => {
@@ -817,8 +700,6 @@ ipcMain.handle('gta-open-panel', async () => {
       const roomToken = res.data?.roomToken || ''
       // Панель сразу с полным набором: комната + токен (панель сама поднимет /streamer).
       openGtaPanelWindow(gtaState.gamePath, username, roomToken)
-      // beta.15: автозапуск агента, если всё готово (мод + ник). Не блокирует открытие панели.
-      void tryAutoStartAgent()
       return { ok: true, gamePath: gtaState.gamePath, room: username, hasStream: !!username }
     }
     await showGtaModal('sub')
@@ -1020,8 +901,6 @@ function initUpdater(): boolean {
     autoUpdater.logger = null
 
     autoUpdater.on('update-available', (info: any) => {
-      // beta.15: сначала сообщаем в renderer (видимый UI), затем нативный диалог.
-      mainWindow?.webContents.send('update-available', { version: info.version, releaseDate: info.releaseDate })
       dialog
         .showMessageBox(mainWindow ?? undefined as any, {
           type: 'info',
@@ -1034,16 +913,13 @@ function initUpdater(): boolean {
         })
         .then((res) => {
           if (res.response === 0) {
-            autoUpdater.downloadUpdate().catch((e: any) => {
-              mainWindow?.webContents.send('update-error', { message: 'Не удалось скачать обновление: ' + (e?.message || '') })
-            })
+            autoUpdater.downloadUpdate().catch(() => {})
           }
         })
     })
 
     autoUpdater.on('update-not-available', () => {
       console.log('[Updater] already up to date:', APP_VERSION)
-      mainWindow?.webContents.send('update-not-available', { version: APP_VERSION })
     })
 
     autoUpdater.on('download-progress', (p: any) => {
@@ -1051,7 +927,6 @@ function initUpdater(): boolean {
     })
 
     autoUpdater.on('update-downloaded', (info: any) => {
-      mainWindow?.webContents.send('update-downloaded', { version: info.version })
       dialog
         .showMessageBox(mainWindow ?? undefined as any, {
           type: 'info',
@@ -1070,9 +945,7 @@ function initUpdater(): boolean {
     })
 
     autoUpdater.on('error', (err: any) => {
-      const msg = err?.message || 'неизвестная ошибка'
-      console.log('[Updater] error:', msg)
-      mainWindow?.webContents.send('update-error', { message: msg })
+      console.log('[Updater] error:', err?.message)
     })
     return true
   } catch (err: any) {
@@ -1113,24 +986,6 @@ function checkForUpdates(interactive = false) {
 ipcMain.handle('check-updates', () => {
   checkForUpdates(true)
   return APP_VERSION
-})
-
-// beta.15: Updater UI — скачать/установить по кнопке из renderer
-ipcMain.handle('update-download', async () => {
-  if (!initUpdater()) return { ok: false, error: 'Авто-обновление недоступно' }
-  try {
-    await autoUpdater.checkForUpdates()
-    await autoUpdater.downloadUpdate()
-    return { ok: true }
-  } catch (e: any) {
-    return { ok: false, error: e?.message || 'Ошибка загрузки' }
-  }
-})
-
-ipcMain.handle('update-install', () => {
-  if (!autoUpdater) return { ok: false, error: 'Обновление не готово' }
-  setImmediate(() => { try { autoUpdater.quitAndInstall() } catch {} })
-  return { ok: true }
 })
 
 // Проверяем обновление через 5 сек после старта (не тормозим запуск)
