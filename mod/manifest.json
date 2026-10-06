@@ -1,89 +1,24 @@
 {
   "name": "MazLiveKOTH",
-  "version": "2.0.0-beta.1",
+  "version": "2.0.0-beta.18",
   "protocol": 2,
   "platform": "GTA V Legacy / Windows / Story Mode",
   "runtimeTested": false,
   "files": [
     {
-      "path": ".github/workflows/build.yml",
-      "size": 948,
-      "sha256": "470afd0483f93e8e93630ce64e7ae9a68d6aa0e426ae04f0b4a3dd9780bf7a2e"
+      "path": "mod/BUILD-MOD.ps1",
+      "size": 3218,
+      "sha256": "6b0d7a632c86672387180dc704c6ac335a476187b23882cdb9e1b0b9c8fe1e21"
     },
     {
-      "path": "BUILD.ps1",
-      "size": 638,
-      "sha256": "335c1ff0dbf4eb76b2ee7f7268e85a2c066736332d557e14bbd1aa304d7832ea"
+      "path": "mod/INSTALL.ps1",
+      "size": 3372,
+      "sha256": "0ff37fbc8023ee946401ece2d8469f161ccd9f0a7b2e7749807d36ed69c19bd8"
     },
     {
-      "path": "INSTALL.cmd",
-      "size": 94,
-      "sha256": "30ed7eb70102629bbdd8f7820b2aa3e4873baf24a5aa7438dcdfaa06cea3b3d0"
-    },
-    {
-      "path": "INSTALL.ps1",
-      "size": 2901,
-      "sha256": "5adf1059ab45fc4118eb0c563e6ea0386dab78c1e423bc72236a685d27d401d3"
-    },
-    {
-      "path": "README.md",
-      "size": 6107,
-      "sha256": "a38dff9e9c67bbb23b8303bc2d7fe99bacbcdbcfea7ce6ee871daf5e550e9bb6"
-    },
-    {
-      "path": "UNINSTALL.cmd",
-      "size": 96,
-      "sha256": "4cc41065a22786feeedabb3bd5418bb047bbba87ff42c6aa43fad0f09f551280"
-    },
-    {
-      "path": "UNINSTALL.ps1",
+      "path": "mod/UNINSTALL.ps1",
       "size": 1628,
       "sha256": "1675b6bd96269497602c0d429bfd9e98d92d8bb4929b03f702cf4c7b2497e1cb"
-    },
-    {
-      "path": "agent/bridge.mjs",
-      "size": 1995,
-      "sha256": "733ec6f2769b7faf0e116bab88a193feeaf008f8e4abd90a932ffcda5050afab"
-    },
-    {
-      "path": "agent/demo.mjs",
-      "size": 869,
-      "sha256": "1355932123c12fc826094031ad213b017b70aa7bf9d8a10a1838569b6bfb2f59"
-    },
-    {
-      "path": "agent/rules.mjs",
-      "size": 3049,
-      "sha256": "b47b08e79482174f3ab211a61731885f12ee5b1224c58234d44c9a17337c22b1"
-    },
-    {
-      "path": "docs/AGENT-TASK-RU.md",
-      "size": 10500,
-      "sha256": "a1c022d4144b15a975a634f2b0fb11b2b3e3e710e6e899089ad9f24f80b72a38"
-    },
-    {
-      "path": "docs/DEPENDENCIES.md",
-      "size": 2110,
-      "sha256": "409cf92b78e187774b5ffb40070a52025d9958e8eed3ae58bfdf5e61248b2160"
-    },
-    {
-      "path": "docs/PROTOCOL.md",
-      "size": 4209,
-      "sha256": "2414e6b510c7d93b6ac00b9701587d72c5c376dba6164fdb5c503157a080d6c7"
-    },
-    {
-      "path": "docs/TEST-REPORT.md",
-      "size": 3425,
-      "sha256": "52ee5c858a7a4ce657ae192e9687f1bac4539cab025982788c2ed45520c23545"
-    },
-    {
-      "path": "docs/build-output.txt",
-      "size": 717,
-      "sha256": "1b2a7acbd2da5dc0642e5b9ffa93a38034eb8de2cf2c136b2747325b59e6ce6c"
-    },
-    {
-      "path": "docs/node-test-output.txt",
-      "size": 561,
-      "sha256": "be55d9eeb46383bce77dbaf2c79fcecb58614b812774a53b449e63f7e460005a"
     },
     {
       "path": "mod/MazLiveKOTH.3.cs",
@@ -91,9 +26,14 @@
       "sha256": "4edea3a51681c941842384cd37bb5bbf01672303cdc4cb3295f4f2e30815bab7"
     },
     {
+      "path": "mod/MazLiveKOTH.csproj",
+      "size": 1820,
+      "sha256": "72a7cd579dd0536240d1b5ea7c108c8148dd506fba17d37ec59a9fec432659d0"
+    },
+    {
       "path": "mod/MazLiveKOTH.dll",
       "size": 24064,
-      "sha256": "6d9bea81e366af382b6942e80bac5eb9f3b0eaa33b3c018fba1b0188ad9b8b9a"
+      "sha256": "8f2875007a422d5f3e6ea7192ab88d51b8aa25e91549f7d76ef6916b5b638cd0"
     },
     {
       "path": "mod/settings.ini",
@@ -101,14 +41,20 @@
       "sha256": "dde691229f6d3305b6d2a12067fa014e00df439fb7921fb9b8dccdc55c7bbdeb"
     },
     {
-      "path": "package.json",
-      "size": 160,
-      "sha256": "09bf1e111e96dbc14d6a060283a64cd1a01561820047f23b3cb91122cc23eaef"
+      "path": "mod/ScriptHookVDotNet.ini",
+      "size": 33,
+      "sha256": "34ab7e962a9f14af2589eff94334d7aa462dae00cb8023f0ebf7ab773e7a498c"
     },
     {
-      "path": "test/bridge.test.mjs",
-      "size": 3438,
-      "sha256": "e1804ec62df174fb1423841c6079fbe80747f2ed8e27297d2fbb9feedda22d34"
+      "path": "mod/LOCKED_REF/ScriptHookVDotNet3.dll",
+      "size": 1055744,
+      "sha256": "f328a36445c1d3e282e70b2791efc0d516ae3009d0d1461bf076893805a01cd9"
+    },
+    {
+      "path": "mod/LOCKED_REF/ScriptHookVDotNet3.dll.sha256",
+      "size": 100,
+      "sha256": "306b2f82481e79858fcec6a520048fa34ff553101bf98a9fefb847866b7d8db7"
     }
-  ]
+  ],
+  "note": "MazLiveKOTH пересобран под ScriptHookVDotNet3 v3.6.0 (ранее ошибочно 3.7.0 nightly)"
 }

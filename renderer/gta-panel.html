@@ -122,7 +122,9 @@
       <div class="row"><span class="label">Путь</span><span class="val" id="vPath">—</span></div>
       <div class="row"><span class="label"><span id="dotSHV" class="dot idle"></span>ScriptHookV</span><span class="val" id="vSHV">—</span></div>
       <div class="row"><span class="label"><span id="dotSHVDN" class="dot idle"></span>ScriptHookVDotNet</span><span class="val" id="vSHVDN">—</span></div>
+      <div class="row"><span class="label"><span id="dotVer" class="dot idle"></span>Версия SHVDN / API мода</span><span class="val" id="vVer">—</span></div>
       <div class="row"><span class="label"><span id="dotMod" class="dot idle"></span>MazLiveKOTH</span><span class="val" id="vModSetup">—</span></div>
+      <div class="row"><span class="label"><span id="dotMod3" class="dot idle"></span>MazLiveKOTH загружен в GTA</span><span class="val" id="vMod3">—</span></div>
       <div class="row"><span class="label"><span id="dotAgent" class="dot idle"></span>MazLive GTA Agent</span><span class="val" id="vAgent">—</span></div>
       <div class="row"><span class="label"><span id="dotStream" class="dot idle"></span>TikTok эфир</span><span class="val" id="vStream">—</span></div>
       <div id="stateBanner" class="banner" style="margin-top:10px">Проверяем состояние…</div>
@@ -159,8 +161,8 @@
     <div class="card">
       <h2>3 · Мод MazLiveKOTH</h2>
       <div class="row">
-        <span class="label"><span id="dotMod3" class="dot idle"></span>Статус мода</span>
-        <span class="val" id="vMod3">—</span>
+        <span class="label"><span id="dotModStatus" class="dot idle"></span>Статус мода</span>
+        <span class="val" id="vModStatus">—</span>
       </div>
       <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:8px">
         <button class="primary" id="bInstall">📦 Установить мод</button>
@@ -493,36 +495,73 @@
     // Верхний state-блок
     const shvOk = !!(f.shvDll && f.asiLoader)
     const shvdnOk = !!(f.shvdnAsi && f.shvdn3Dll)
-    dot($('dotSHV'), shvOk?'ok':'err'); $('vSHV').textContent = shvOk?'установлен':'не установлен'
-    dot($('dotSHVDN'), shvdnOk?'ok':'err'); $('vSHVDN').textContent = shvdnOk?'установлен':'не установлен'
+    dot($('dotSHV'), shvOk?'ok':'err'); $('vSHV').textContent = shvOk?'установлен (файлы)':'не установлен'
+    dot($('dotSHVDN'), shvdnOk?'ok':'err'); $('vSHVDN').textContent = shvdnOk?'установлен (файлы)':'не установлен'
+
+    // Версии SHVDN vs API мода
+    const ver = (deps && deps.versions) || {}
+    const inst = ver.shvdnInstalled || null
+    const tgt = ver.modApiTarget || null
+    const compat = ver.compatible
+    if($('vVer')){
+      $('vVer').textContent = (inst||tgt) ? ('SHVDN ' + (inst||'?') + ' / мод под API ' + (tgt||'?')) : '—'
+    }
+    if($('dotVer')){
+      dot($('dotVer'), compat===false ? 'err' : (compat===true ? 'ok' : 'idle'))
+    }
+    if(compat === false){
+      $('vVer').textContent = 'SHVDN ' + inst + ' ≠ API мода ' + tgt
+    }
     if(deps){
-      $('depsHint').innerHTML = deps.ok
-        ? '✅ Все обязательные зависимости на месте.'
-        : ('❌ Отсутствует:<br>• ' + (deps.missingComponents||[]).filter(c=>c.id!=='GTA').map(c=>`<b>${c.label}</b> — нет: ${c.files.join(', ')}`).join('<br>• '))
+      let hint
+      if(compat === false){
+        hint = '⚠️ <b>Версия ScriptHookVDotNet не соответствует версии, под которую собран MazLiveKOTH.</b><br>' +
+               `Установлено: <b>${inst}</b>, мод собран под API <b>${tgt}</b>.<br>` +
+               'Установите официальный ScriptHookVDotNet той же версии (stable 3.6.0) и нажмите «🔄 Проверить снова».'
+      } else if(deps.ok){
+        hint = '✅ Все обязательные зависимости на месте.'
+      } else {
+        hint = '❌ Отсутствует:<br>• ' + (deps.missingComponents||[]).filter(c=>c.id!=='GTA').map(c=>`<b>${c.label}</b> — нет: ${c.files.join(', ')}`).join('<br>• ')
+      }
+      $('depsHint').innerHTML = hint
     }
     window.__lastDeps = deps
   }
 
-  // setModState(statusObj, depsObj) — теперь учитывает 3 состояния.
-  //  filesInstalled: скопированы файлы MazLiveKOTH
-  //  depsOk:         зависимости готовы
-  //  ready:          ✅ готов к работе (both)
-  function setModState(status, deps){
+  // setModState(statusObj, depsObj, modLiveObj) — учитывает РАЗДЕЛЬНЫЕ состояния:
+  //  1) файлы мода установлены (скопированы DLL/ini)
+  //  2) зависимости готовы (SHV + SHVDN файлы + совпадение версии API)
+  //  3) ready = файлы + deps
+  //  4) modLive  = MazLiveKOTH РЕАЛЬНО загружен в GTA (свежий status.json)
+  function setModState(status, deps, modLive){
     status = status || {}
     const files = !!status.filesInstalled
     const depsOk = !!(status.depsOk !== undefined ? status.depsOk : (deps && deps.ok))
     const ready = !!status.ready
+    const live = !!(modLive && modLive.loaded)
     modInstalled = files
 
     let label, cls
-    if(ready){ label='✅ MazLiveKOTH готов'; cls='ok' }
+    if(ready){ label='✅ Файлы и зависимости готовы'; cls='ok' }
     else if(files && !depsOk){ label='⚠️ Файлы мода установлены, но не хватает зависимостей'; cls='err' }
     else if(!files && depsOk){ label='Зависимости готовы — установите мод'; cls='idle' }
     else { label='❌ Не установлен'; cls='err' }
 
-    dot($('dotMod'), cls); dot($('dotMod3'), cls)
+    dot($('dotMod'), cls); if($('dotModStatus')) dot($('dotModStatus'), cls)
     $('vModSetup').textContent = ready ? 'готов' : (files ? 'файлы установлены' : 'не установлен')
-    $('vMod3').textContent = label
+    if($('vModStatus')) $('vModStatus').textContent = label
+
+    // ── Отдельная строка: MazLiveKOTH загружен в GTA (по свежести status.json) ──
+    if($('dotMod3') && $('vMod3')){
+      if(live){
+        dot($('dotMod3'), 'ok'); $('vMod3').textContent = '✅ загружен в игру'
+      } else if(files && depsOk){
+        dot($('dotMod3'), 'idle')
+        $('vMod3').textContent = '— запустите GTA Story Mode'
+      } else {
+        dot($('dotMod3'), 'idle'); $('vMod3').textContent = '—'
+      }
+    }
 
     // Кнопки
     $('bInstall').disabled = files && depsOk              // можно ставить, если ещё не готов
@@ -579,8 +618,9 @@
     try { st = await api.state() } catch(e){}
     const deps = (st && st.deps) || null
     const modStatus = (st && st.modStatus) || null
+    const modLive = (st && st.modLive) || null
     updateDeps(deps)
-    setModState(modStatus, deps)
+    setModState(modStatus, deps, modLive)
 
     $('vPath').textContent = gamePath || 'не найдена'
     $('vPath1').textContent = gamePath || 'не найдена'
@@ -694,6 +734,9 @@
   function humanErr(e){
     const raw = (e && e.message) ? e.message : String(e||'')
     if(/DEPS_MISSING|зависимост/i.test(raw)) return 'Не хватает обязательных зависимостей — установите их (шаг 2).'
+    // Несовместимость версии SHVDN (мод собран под другую версию API)
+    if(/Unable to resolve API|API version|AssemblyRef|version mismatch/i.test(raw))
+      return 'Версия ScriptHookVDotNet не соответствует версии, под которую собран MazLiveKOTH. Установите официальный ScriptHookVDotNet stable 3.6.0 и нажмите «Проверить снова».'
     // Мост к моду: status.json отсутствует / мод не загружен в игру
     if(/ENOENT|status\.json|Mod offline|clock skew|Incompatible mod protocol/i.test(raw))
       return 'Мод MazLiveKOTH ещё не загружен в GTA. Команды в игру заработают после запуска GTA со Story Mode и загрузки мода.'

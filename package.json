@@ -1,6 +1,6 @@
 {
   "name": "mazlive-desktop",
-  "version": "2.0.0-beta.17",
+  "version": "2.0.0-beta.18",
   "description": "Mazlive Desktop 2.0 Beta — Streamer Game Launcher (web-games + GTA «Царь горы»)",
   "main": "dist/main.js",
   "scripts": {
@@ -43,7 +43,18 @@
       },
       {
         "from": "mod",
-        "to": "mod"
+        "to": "mod",
+        "filter": [
+          "**/*",
+          "!LOCKED_REF/**",
+          "!*.cs",
+          "!*.csproj",
+          "!BUILD-MOD.ps1",
+          "!update-manifest.py",
+          "!SHA256SUMS.txt",
+          "!manifest.json",
+          "!UNINSTALL.ps1"
+        ]
       }
     ],
     "win": {

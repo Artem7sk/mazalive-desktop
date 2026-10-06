@@ -233,6 +233,19 @@ async function createGameWindow(gameSlug: string, roomId: string, roomToken: str
   gameWindow.setMenuBarVisibility(false)
   gameWindow.setAutoHideMenuBar(true)
 
+  // ✅ КРИТИЧНО: nginx отдаёт HTML/JS игр ТОЛЬКО при UA `mazalive-desktop`
+  // (иначе 403 «APP ONLY», даже если игру открыли из приложения).
+  // Плюс шлём заголовок x-mazalive-app на случай middleware-проверки на сайте.
+  try {
+    gameWindow.webContents.setUserAgent('mazalive-desktop')
+    const gs = session.fromPartition('persist:game')
+    gs.webRequest.onBeforeSendHeaders((details, cb) => {
+      details.requestHeaders['User-Agent'] = 'mazalive-desktop'
+      details.requestHeaders['x-mazalive-app'] = 'maza_app_2026_x9k'
+      cb({ requestHeaders: details.requestHeaders })
+    })
+  } catch (e) { /* не критично */ }
+
   // ✅ БЕЗОПАСНОСТЬ: игра загружается ТОЛЬКО с нашего сервера
   // Исходный HTML/JS никогда не попадает на диск пользователя
   // Читаем язык из cookie (выбран в дашборде). Дефолт — русский.
@@ -409,8 +422,8 @@ async function startDesktopGame(gameSlug: string, roomId: string, roomToken: str
     return
   }
 
-  // 2) Проверяем зависимости и мод (мод готов ТОЛЬКО при наличии SHV+SHVDN3)
-  const dep = checkDependencies(gamePath)
+  // 2) Проверяем зависимости и мод (мод готов ТОЛЬКО при наличии SHV+SHVDN3 и совпадении версии API)
+  const dep = checkDependencies(gamePath, modSourceDir())
   const st = getModStatus(gamePath, modSourceDir())
   const modInstalled = st.filesInstalled
   gtaState.modInstalled = modInstalled
@@ -622,7 +635,7 @@ ipcMain.handle('launch-game', async (_event, { gameSlug, roomId }: { gameSlug: s
 ipcMain.handle('gta-detect', () => {
   const found = autoDetectGta()
   if (found) gtaState.gamePath = found.gamePath
-  const dep = found ? checkDependencies(found.gamePath) : null
+  const dep = found ? checkDependencies(found.gamePath, modSourceDir()) : null
   const modInstalled = found ? fs.existsSync(path.join(found.gamePath, 'scripts', 'MazLiveKOTH.dll')) : false
   gtaState.modInstalled = modInstalled
   return {
@@ -638,7 +651,7 @@ ipcMain.handle('gta-check-path', (_event, { gamePath }: { gamePath: string }) =>
   const hit = findGtaInDir(String(gamePath || ''))
   if (!hit) return { ok: false, error: 'GTA5.exe не найден по этому пути' }
   gtaState.gamePath = hit.gamePath
-  const dep = checkDependencies(hit.gamePath)
+  const dep = checkDependencies(hit.gamePath, modSourceDir())
   const modInstalled = fs.existsSync(path.join(hit.gamePath, 'scripts', 'MazLiveKOTH.dll'))
   gtaState.modInstalled = modInstalled
   return { ok: true, gamePath: hit.gamePath, deps: dep, modInstalled }
@@ -678,12 +691,24 @@ ipcMain.handle('gta-state', () => {
   let gtaFound = false
   let deps: any = null
   let mod: any = { filesInstalled: false, depsOk: false, ready: false }
+  // modLive: мод РЕАЛЬНО загружен в GTA — по свежести status.json (пишет сам мод).
+  let modLive: any = { loaded: false, mtime: null, ageMs: null, path: null }
   if (gtaState.gamePath && findGtaInDir(gtaState.gamePath)) {
     gtaFound = true
-    try { deps = checkDependencies(gtaState.gamePath) } catch {}
+    try { deps = checkDependencies(gtaState.gamePath, modSourceDir()) } catch {}
     try { mod = getModStatus(gtaState.gamePath, modSourceDir()) } catch {}
     // modInstalled = «файлы скопированы» (не = готов!)
     gtaState.modInstalled = !!mod.filesInstalled
+    try {
+      const statusPath = path.join(gtaState.gamePath, 'scripts', 'MazLiveKOTH', 'status.json')
+      if (fs.existsSync(statusPath)) {
+        const stt = fs.statSync(statusPath)
+        const age = Date.now() - stt.mtimeMs
+        modLive = { loaded: age < 15000, mtime: stt.mtime.toISOString(), ageMs: age, path: statusPath }
+      } else {
+        modLive.path = statusPath
+      }
+    } catch {}
   }
   return {
     ...gtaState,
@@ -691,6 +716,7 @@ ipcMain.handle('gta-state', () => {
     deps,
     // modStatus: filesInstalled / depsOk / ready + missingComponents
     modStatus: mod,
+    modLive,
     agent: agentMod,
   }
 })
@@ -893,7 +919,7 @@ ipcMain.handle('gta-select-dir', async () => {
   const hit = findGtaInDir(dir)
   if (!hit) return { ok: false, error: 'GTA5.exe не найден по этому пути' }
   gtaState.gamePath = hit.gamePath
-  const deps = checkDependencies(hit.gamePath)
+  const deps = checkDependencies(hit.gamePath, modSourceDir())
   const modInstalled = fs.existsSync(path.join(hit.gamePath, 'scripts', 'MazLiveKOTH.dll'))
   gtaState.modInstalled = modInstalled
   return { ok: true, gamePath: hit.gamePath, deps, modInstalled }

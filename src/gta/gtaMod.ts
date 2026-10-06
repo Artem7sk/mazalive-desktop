@@ -11,7 +11,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { execFile, spawn } from 'node:child_process';
+import { execFile, execFileSync, spawn } from 'node:child_process';
 
 export interface GtaHit { gamePath: string; exe: string }
 export interface DepCheck {
@@ -28,6 +28,12 @@ export interface DepCheck {
   };
   /** Обязательные компоненты, которых не хватает (для UI). */
   missingComponents: Array<{ id: 'GTA' | 'ScriptHookV' | 'ScriptHookVDotNet'; label: string; files: string[] }>;
+  /** Версии SHVDN: установленная в GTA vs та, под которую собран наш мод. */
+  versions: {
+    shvdnInstalled: string | null;   // AssemblyVersion ScriptHookVDotNet3.dll (напр. "3.6.0.0")
+    modApiTarget: string | null;     // AssemblyRef ScriptHookVDotNet3 в MazLiveKOTH.dll
+    compatible: boolean | null;      // совпадают ли мажор.минор
+  };
 }
 export interface ModAction { file: string; action: string; backup?: string }
 
@@ -69,13 +75,58 @@ export function autoDetectGta(): GtaHit | null {
  *  2) ScriptHookVDotNet 3 → ScriptHookVDotNet.asi + ScriptHookVDotNet3.dll
  *
  * Проверяем ВСЕ обязательные файлы по отдельности (старый `.some()` давал ложный OK).
+/**
+ * Читает версию сборки .NET (AssemblyVersion) и версии зависимостей (AssemblyRef)
+ * из DLL. Использует PowerShell (`[Reflection.AssemblyName]::GetAssemblyName`) —
+ * тот же надёжный способ, что в mod/INSTALL.ps1. На не-Windows / при ошибке
+ * возвращает пустой результат (версии просто не показываются).
+ *
+ * Возвращает { self, refs } где refs['ScriptHookVDotNet3'] = '3.6.0.0'.
  */
-export function checkDependencies(gamePath: string | null): DepCheck {
+function readNetVersions(dllPath: string): { self: string | null; refs: Record<string, string> } {
+  const out: { self: string | null; refs: Record<string, string> } = { self: null, refs: {} };
+  if (process.platform !== 'win32') return out;
+  if (!fs.existsSync(dllPath)) return out;
+  try {
+    // Путь передаём через переменную окружения (безопасно для пробелов и кириллицы).
+    const ps =
+      '$ErrorActionPreference="Stop";' +
+      '$p=$env:MAZLIVE_DLL;' +
+      '$n=[System.Reflection.AssemblyName]::GetAssemblyName($p);' +
+      '$self=$n.Version.ToString();' +
+      '$refs=@{};' +
+      'try{' +
+      '  $asm=[System.Reflection.Assembly]::ReflectionOnlyLoadFrom($p);' +
+      '  foreach($r in $asm.GetReferencedAssemblies()){ $refs[$r.Name]=$r.Version.ToString() }' +
+      '}catch{};' +
+      'ConvertTo-Json @{ self=$self; refs=$refs } -Compress';
+    const raw = execFileSync(
+      'powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-Command', ps],
+      { encoding: 'utf8', timeout: 8000, windowsHide: true, env: { ...process.env, MAZLIVE_DLL: dllPath } }
+    ).trim();
+    if (!raw) return out;
+    const parsed = JSON.parse(raw) as { self?: string; refs?: Record<string, string> };
+    if (parsed.self) out.self = parsed.self;
+    if (parsed.refs) out.refs = parsed.refs;
+  } catch { /* версии неизвестны */ }
+  return out;
+}
+
+function versionsCompatible(installed: string | null, target: string | null): boolean | null {
+  if (!installed || !target) return null;
+  const a = installed.split('.'), b = target.split('.');
+  // совместимо, если совпадают мажор и минор (3.6.x ↔ 3.6.y)
+  return a[0] === b[0] && a[1] === b[1];
+}
+
+export function checkDependencies(gamePath: string | null, modSourceDir?: string): DepCheck {
   const empty: DepCheck = {
     ok: false,
     missing: ['GAME_PATH'],
     details: { gameExe: false, scriptHookV: false, scriptHookVDotNet: false },
     files: { gameExe: false, shvDll: false, asiLoader: false, shvdnAsi: false, shvdn3Dll: false },
+    versions: { shvdnInstalled: null, modApiTarget: null, compatible: null },
     missingComponents: [
       { id: 'GTA', label: 'GTA V Legacy', files: ['GTA5.exe'] },
       { id: 'ScriptHookV', label: 'ScriptHookV', files: ['ScriptHookV.dll', 'dinput8.dll'] },
@@ -97,10 +148,24 @@ export function checkDependencies(gamePath: string | null): DepCheck {
   const shvOk = files.shvDll && files.asiLoader;
   const shvdnOk = files.shvdnAsi && files.shvdn3Dll;
 
+  // ── Версии SHVDN: установленная в GTA vs та, под которую собран наш мод ──
+  const shvdn3Path = path.join(gamePath, 'ScriptHookVDotNet3.dll');
+  const shvdnInstalled = files.shvdn3Dll ? readNetVersions(shvdn3Path).self : null;
+  let modApiTarget: string | null = null;
+  if (modSourceDir) {
+    const modDll = path.join(modSourceDir, 'MazLiveKOTH.dll');
+    if (fs.existsSync(modDll)) {
+      modApiTarget = readNetVersions(modDll).refs['ScriptHookVDotNet3'] || null;
+    }
+  }
+  const compatible = versionsCompatible(shvdnInstalled, modApiTarget);
+
   const missing: string[] = [];
   if (!files.gameExe) missing.push('GTA5.exe');
   if (!shvOk) missing.push('ScriptHookV');
   if (!shvdnOk) missing.push('ScriptHookVDotNet');
+  // Несовместимая версия SHVDN = тоже "missing" (мод не загрузится), но с отдельной формулировкой.
+  const apiMismatch = shvdnOk && compatible === false;
 
   const missingComponents: DepCheck['missingComponents'] = [];
   if (!files.gameExe) missingComponents.push({ id: 'GTA', label: 'GTA V Legacy', files: ['GTA5.exe'] });
@@ -111,13 +176,20 @@ export function checkDependencies(gamePath: string | null): DepCheck {
   if (!shvdnOk) {
     const lack = [!files.shvdnAsi && 'ScriptHookVDotNet.asi', !files.shvdn3Dll && 'ScriptHookVDotNet3.dll'].filter(Boolean) as string[];
     missingComponents.push({ id: 'ScriptHookVDotNet', label: 'ScriptHookVDotNet 3', files: lack });
+  } else if (apiMismatch) {
+    missingComponents.push({
+      id: 'ScriptHookVDotNet',
+      label: `ScriptHookVDotNet ${shvdnInstalled} несовместим (мод собран под API ${modApiTarget})`,
+      files: [`Версия ScriptHookVDotNet не соответствует версии, под которую собран MazLiveKOTH.`],
+    });
   }
 
   return {
-    ok: missing.length === 0,
+    ok: missing.length === 0 && !apiMismatch,
     missing,
     details: { gameExe: files.gameExe, scriptHookV: shvOk, scriptHookVDotNet: shvdnOk },
     files,
+    versions: { shvdnInstalled, modApiTarget, compatible },
     missingComponents,
   };
 }
@@ -141,7 +213,7 @@ function readModVersion(modSourceDir: string): string {
 
 /** Установка мода. ТРЕБУЕТ готовые зависимости (SHV + SHVDN3). Идемпотентно, с бэкапами. */
 export function installMod(gamePath: string, modSourceDir: string) {
-  const dep = checkDependencies(gamePath);
+  const dep = checkDependencies(gamePath, modSourceDir);
   if (!dep.files.gameExe) throw new Error('GTA5.exe не найден в выбранной папке');
   // ⚠️ Ключевое: НЕ ставим мод без обязательных зависимостей. Иначе мод не загрузится в игре.
   if (!dep.ok) {
@@ -281,7 +353,7 @@ export interface ModStatus {
  *  - `ready` — И то, И другое (единственный случай зелёного статуса).
  */
 export function getModStatus(gamePath: string | null, modSourceDir: string): ModStatus {
-  const deps = checkDependencies(gamePath);
+  const deps = checkDependencies(gamePath, modSourceDir);
   let filesInstalled = false;
   if (gamePath) {
     const dll = path.join(gamePath, 'scripts', 'MazLiveKOTH.dll');
