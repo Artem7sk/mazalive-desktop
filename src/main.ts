@@ -79,8 +79,12 @@ let gtaState: {
 
 // Папка с упакованными ресурсами мода (в prod — resources/mod, в dev — ./mod)
 function modSourceDir(): string {
+  // В упакованном приложении ресурсы лежат в resources/mod (собираются из mod-dist).
   const packaged = path.join(process.resourcesPath || '', 'mod')
   if (fs.existsSync(packaged)) return packaged
+  // Dev: сначала mod-dist (если подготовлен), иначе исходный mod/.
+  const dist = path.join(__dirname, '..', 'mod-dist')
+  if (fs.existsSync(dist)) return dist
   return path.join(__dirname, '..', 'mod')
 }
 

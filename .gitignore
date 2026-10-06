@@ -4,3 +4,6 @@ dist/
 .DS_Store
 *.bak_beta14_*
 *.bak_*
+mod-dist/
+mod/bin/
+mod/obj/

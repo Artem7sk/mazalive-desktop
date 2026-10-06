@@ -1,15 +1,15 @@
 {
   "name": "mazlive-desktop",
-  "version": "2.0.0-beta.19",
+  "version": "2.0.0-beta.20",
   "description": "Mazlive Desktop 2.0 Beta — Streamer Game Launcher (web-games + GTA «Царь горы»)",
   "main": "dist/main.js",
   "scripts": {
     "build": "tsc",
     "start": "electron .",
     "test": "node --test test/bridge.test.mjs test/rules.test.mjs test/gta-agent.test.mjs",
-    "dist": "npm run build && electron-builder",
-    "build-win": "npm run build && electron-builder --win",
-    "build-mac": "npm run build && electron-builder --mac"
+    "dist": "npm run build && node prepare-mod-dist.mjs && electron-builder",
+    "build-win": "npm run build && node prepare-mod-dist.mjs && electron-builder --win",
+    "build-mac": "npm run build && node prepare-mod-dist.mjs && electron-builder --mac"
   },
   "author": "Mazlive",
   "license": "UNLICENSED",
@@ -42,14 +42,8 @@
         "to": "agent"
       },
       {
-        "from": "mod",
-        "to": "mod",
-        "filter": [
-          "MazLiveKOTH.dll",
-          "settings.ini",
-          "ScriptHookVDotNet.ini",
-          "manifest.json"
-        ]
+        "from": "mod-dist",
+        "to": "mod"
       }
     ],
     "win": {

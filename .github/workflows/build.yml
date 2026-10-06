@@ -35,7 +35,7 @@ jobs:
       - name: Unit tests (agent/rules/bridge)
         run: npm test
       - name: Build Windows EXE (NSIS)
-        run: npx tsc && npx electron-builder --win
+        run: npx tsc && node prepare-mod-dist.mjs && npx electron-builder --win
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Smoke-test packaged app (asar + agent ESM load + window)
@@ -71,9 +71,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Build MazLiveKOTH mod (LOCKED SHVDN 3.6.0)
+        shell: pwsh
+        run: |
+          powershell -ExecutionPolicy Bypass -File mod\BUILD-MOD.ps1
+          if ($LASTEXITCODE -ne 0) { Write-Error "mod build failed"; exit 1 }
       - run: npm ci
       - run: npm test
-      - run: npx tsc && npx electron-builder --mac
+      - run: npx tsc && node prepare-mod-dist.mjs && npx electron-builder --mac
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
       - uses: actions/upload-artifact@v4
