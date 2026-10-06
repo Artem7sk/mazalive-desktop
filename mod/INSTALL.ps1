@@ -4,11 +4,15 @@ if(!$GamePath){$GamePath=(Read-Host 'GTA V Legacy folder (contains GTA5.exe)').T
 $GamePath=(Resolve-Path -LiteralPath $GamePath).Path
 if(Get-Process GTA5,GTA5_Enhanced -ErrorAction SilentlyContinue){throw 'Close GTA before installing'}
 foreach($f in @('GTA5.exe','ScriptHookV.dll','dinput8.dll','ScriptHookVDotNet.asi','ScriptHookVDotNet3.dll')){if(!(Test-Path -LiteralPath (Join-Path $GamePath $f))){throw "Missing $f. Install compatible official dependencies first; see README.md"}}
+# Проверяем, что установленный SHVDN той версии, под которую собран мод (API 3.6.0).
+$apiDll=Join-Path $GamePath 'ScriptHookVDotNet3.dll'
+$installedApi=([System.Reflection.AssemblyName]::GetAssemblyName($apiDll)).Version.ToString()
+if($installedApi -notlike '3.6.*'){throw "ScriptHookVDotNet version mismatch: installed $installedApi, MazLiveKOTH built for 3.6.0. Install official ScriptHookVDotNet v3.6.0."}
 $root=Join-Path $GamePath 'scripts\MazLiveKOTH'
 $manifest=Join-Path $root 'beta-install.json'
 if(Test-Path -LiteralPath $manifest){throw 'Beta already installed. Uninstall beta first to restore previous files.'}
 $source=Join-Path $PSScriptRoot 'mod\MazLiveKOTH.dll'
-if(!(Test-Path -LiteralPath $source)){& (Join-Path $PSScriptRoot 'BUILD.ps1') -ApiDll (Join-Path $GamePath 'ScriptHookVDotNet3.dll')}
+if(!(Test-Path -LiteralPath $source)){throw "MazLiveKOTH.dll not found at $source. Build it with mod\BUILD-MOD.ps1 (locked SHVDN 3.6.0)."}
 $backupRoot=Join-Path $root ('backups\'+[Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $backupRoot -Force | Out-Null
 $entries=New-Object 'System.Collections.Generic.List[object]'

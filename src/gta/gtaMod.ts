@@ -182,6 +182,19 @@ export function installMod(gamePath: string, modSourceDir: string) {
   doCopy('MazLiveKOTH.dll', path.join(scriptsDir, 'MazLiveKOTH.dll'), 'scripts/MazLiveKOTH.dll');
   doCopy('settings.ini', path.join(kothDir, 'settings.ini'), 'scripts/MazLiveKOTH/settings.ini');
 
+  // ScriptHookVDotNet.ini в корень GTA — убирает [ERROR] Failed to load config в логе.
+  // НЕ перезаписываем, если пользователь уже имеет свой ini.
+  const shvdnIniSrc = path.join(modSourceDir, 'ScriptHookVDotNet.ini');
+  const shvdnIniDest = path.join(gamePath, 'ScriptHookVDotNet.ini');
+  if (fs.existsSync(shvdnIniSrc)) {
+    if (!fs.existsSync(shvdnIniDest)) {
+      fs.copyFileSync(shvdnIniSrc, shvdnIniDest);
+      actions.push({ file: 'ScriptHookVDotNet.ini', action: 'installed' });
+    } else {
+      actions.push({ file: 'ScriptHookVDotNet.ini', action: 'skip (уже есть)' });
+    }
+  }
+
   const marker = {
     installedBy: 'MAZLIVE',
     version: readModVersion(modSourceDir),

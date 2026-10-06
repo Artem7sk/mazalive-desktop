@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- ============================================================
+       MAZLIVE KOTH — проект сборки мода для GTA V Legacy (SHVDN 3).
+       ВАЖНО: версия ScriptHookVDotNet зафиксирована через AssemblyReference
+       hint-path на LOCKED_REF, а не на DLL из случайной папки GTA.
+       TargetFramework net48 + API 3 => скрипт грузится ScriptHookVDotNet3.dll.
+       ============================================================ -->
+
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <AssemblyName>MazLiveKOTH</AssemblyName>
+    <RootNamespace>MazLiveKOTH</RootNamespace>
+    <OutputType>Library</OutputType>
+    <LangVersion>latest</LangVersion>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <Deterministic>true</Deterministic>
+    <!-- Никаких NuGet-референсов SHVDN: только локальная locked-DLL -->
+    <RestoreSources></RestoreSources>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="MazLiveKOTH.3.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- ФИКСИРОВАННЫЙ референс. Private=false => DLL НЕ копируется в вывод
+         (в игре используется установленная пользователем ScriptHookVDotNet3.dll). -->
+    <Reference Include="ScriptHookVDotNet3">
+      <HintPath>$(MSBuildThisFileDirectory)LOCKED_REF\ScriptHookVDotNet3.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Core" />
+  </ItemGroup>
+
+</Project>

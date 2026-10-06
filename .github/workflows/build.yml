@@ -18,6 +18,16 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Build MazLiveKOTH mod (LOCKED SHVDN 3.6.0)
+        shell: pwsh
+        run: |
+          # Собираем мод против закреплённого ScriptHookVDotNet3 v3.6.0.
+          # BUILD-MOD.ps1 падает, если итоговый DLL требует иную версию API (защита от 3.7.0).
+          powershell -ExecutionPolicy Bypass -File mod\BUILD-MOD.ps1
+          if ($LASTEXITCODE -ne 0) { Write-Error "mod build failed"; exit 1 }
       - name: Install deps
         run: npm ci
       - name: Typecheck
