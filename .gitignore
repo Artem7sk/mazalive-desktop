@@ -3,3 +3,4 @@ dist/
 *.log
 .DS_Store
 *.bak_beta14_*
+*.bak_*

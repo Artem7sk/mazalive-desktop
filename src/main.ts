@@ -21,6 +21,7 @@ import {
   autoDetectGta,
   findGtaInDir,
   checkDependencies,
+  getModStatus,
   installMod,
   uninstallMod,
   launchGta,
@@ -408,15 +409,20 @@ async function startDesktopGame(gameSlug: string, roomId: string, roomToken: str
     return
   }
 
-  // 2) Проверяем зависимости и мод
+  // 2) Проверяем зависимости и мод (мод готов ТОЛЬКО при наличии SHV+SHVDN3)
   const dep = checkDependencies(gamePath)
-  const modInstalled = fs.existsSync(path.join(gamePath, 'scripts', 'MazLiveKOTH.dll'))
+  const st = getModStatus(gamePath, modSourceDir())
+  const modInstalled = st.filesInstalled
   gtaState.modInstalled = modInstalled
   if (!dep.ok || !modInstalled) {
+    const stage = !dep.ok ? 'deps-missing' : 'mod-missing'
     sendToMain('gta-required', {
-      stage: !dep.ok ? 'deps-missing' : 'mod-missing',
-      message: 'Требуется установка мода / зависимостей.',
+      stage,
+      message: !dep.ok
+        ? 'Не хватает зависимостей: ' + dep.missingComponents.filter((c) => c.id !== 'GTA').map((c) => c.label).join(', ')
+        : 'Требуется установка мода MazLiveKOTH.',
       missing: dep.missing,
+      missingComponents: dep.missingComponents,
       gamePath,
     })
     // Открываем панель онбординга (проверка зависимостей / установка мода).
@@ -531,9 +537,12 @@ async function tryAutoStartAgent(): Promise<void> {
     const gp = gtaState.gamePath || autoDetectGta()?.gamePath || null
     if (!gp || !findGtaInDir(gp)) return
     gtaState.gamePath = gp
-    const modOk = fs.existsSync(path.join(gp, 'scripts', 'MazLiveKOTH.dll'))
-    gtaState.modInstalled = modOk
-    if (!modOk) return
+    const st = getModStatus(gp, modSourceDir())
+    gtaState.modInstalled = !!st.filesInstalled
+    // ⚠️ Автозапуск — консервативный: только когда мод ПОЛНОСТЬЮ готов
+    // (файлы + зависимости). Ручной старт (кнопка) доступен и без этого —
+    // агент полезен для диагностики/подключения эфира до готовности ScriptHook.
+    if (!st.ready) return
     const room = String((await getTikTokUsername()) || '').replace('@', '').trim().toLowerCase()
     if (!room) return
     const token = await resolveToken()
@@ -639,10 +648,12 @@ ipcMain.handle('gta-install-mod', async (_event, { gamePath }: { gamePath: strin
   const gp = gamePath && findGtaInDir(String(gamePath)) ? findGtaInDir(String(gamePath))!.gamePath : gtaState.gamePath
   if (!gp) throw new Error('GTA не найдена')
   if (await isGtaRunning()) throw new Error('Закройте GTA перед установкой мода')
+  // installMod сам бросит DEPS_MISSING, если SHV/SHVDN отсутствуют.
   const res = installMod(gp, modSourceDir())
   gtaState.gamePath = gp
-  gtaState.modInstalled = true
-  return res
+  const status = getModStatus(gp, modSourceDir())
+  gtaState.modInstalled = !!status.filesInstalled
+  return { ...res, modStatus: status }
 })
 
 ipcMain.handle('gta-uninstall-mod', async (_event, { gamePath }: { gamePath: string }) => {
@@ -655,9 +666,8 @@ ipcMain.handle('gta-uninstall-mod', async (_event, { gamePath }: { gamePath: str
 })
 
 ipcMain.handle('gta-state', () => {
-  let mod: any = null
-  if (gtaAgent) { try { mod = gtaAgent.state() } catch (e: any) { mod = { error: e.message } } }
-  // Обновляем живые флаги из агента (если он есть)
+  let agentMod: any = null
+  if (gtaAgent) { try { agentMod = gtaAgent.state() } catch (e: any) { agentMod = { error: e.message } } }
   if (gtaAgent) {
     try { gtaState.agentRunning = true; gtaState.streamConnected = !!gtaAgent.streamLive } catch {}
   } else {
@@ -667,16 +677,21 @@ ipcMain.handle('gta-state', () => {
   // Проверяем существование пути/мода на диске (для актуального Wizard-статуса)
   let gtaFound = false
   let deps: any = null
+  let mod: any = { filesInstalled: false, depsOk: false, ready: false }
   if (gtaState.gamePath && findGtaInDir(gtaState.gamePath)) {
     gtaFound = true
     try { deps = checkDependencies(gtaState.gamePath) } catch {}
-    gtaState.modInstalled = fs.existsSync(path.join(gtaState.gamePath, 'scripts', 'MazLiveKOTH.dll'))
+    try { mod = getModStatus(gtaState.gamePath, modSourceDir()) } catch {}
+    // modInstalled = «файлы скопированы» (не = готов!)
+    gtaState.modInstalled = !!mod.filesInstalled
   }
   return {
     ...gtaState,
     gtaFound,
     deps,
-    agent: mod,
+    // modStatus: filesInstalled / depsOk / ready + missingComponents
+    modStatus: mod,
+    agent: agentMod,
   }
 })
 
@@ -707,10 +722,15 @@ ipcMain.handle('gta-agent-start', async (_e, { username }: { username?: string }
     const gp = gtaState.gamePath || autoDetectGta()?.gamePath || null
     if (!gp || !findGtaInDir(gp)) return { ok: false, reason: 'gta-missing', error: 'GTA V Legacy не найдена' }
     gtaState.gamePath = gp
-    // 2) Мод
-    const modOk = fs.existsSync(path.join(gp, 'scripts', 'MazLiveKOTH.dll'))
-    gtaState.modInstalled = modOk
-    if (!modOk) return { ok: false, reason: 'mod-missing', error: 'Мод MazLiveKOTH не установлен' }
+    // 2) Статус мода/зависимостей.
+    //    ⚠️ GTA Agent — ОТДЕЛЬНЫЙ Node-процесс. Ему НЕ нужны ScriptHookV/SHVDN3,
+    //    чтобы запуститься и подключиться к MazLive + TikTok: связь с игрой идёт
+    //    через файлы scripts/MazLiveKOTH/*.json, которые пишет мод. Мост к моду
+    //    проверяется на уровне КОМАНД (send), а не старта агента.
+    //    Поэтому старт агента гейтим только по наличию GTA, а не по deps/ready.
+    const st = getModStatus(gp, modSourceDir())
+    gtaState.modInstalled = !!st.filesInstalled
+    // (без блокировки здесь — диагностика и подключение эфира возможны и до готовности мода)
     // 3) Подписка
     const token = await resolveToken()
     if (!token) return { ok: false, reason: 'auth', error: 'Нужно войти в аккаунт' }

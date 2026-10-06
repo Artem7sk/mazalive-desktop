@@ -149,8 +149,9 @@
         <span class="tag">ScriptHookVDotNet</span>
       </div>
       <div class="small" id="depsHint" style="margin-top:8px">Выберите папку игры, чтобы проверить зависимости.</div>
-      <div class="grid" style="grid-template-columns:1fr;margin-top:8px">
-        <button id="bDepsHelp">📖 Как установить ScriptHookV / ScriptHookVDotNet</button>
+      <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:8px">
+        <button id="bDepsHelp">📖 Официальная инструкция</button>
+        <button id="bRescan">🔄 Проверить снова</button>
       </div>
       <div class="small" style="margin-top:6px">Зависимости распространяются их авторами — качаем только из официальных источников.</div>
     </div>
@@ -473,34 +474,60 @@
     }
   }
 
-  // ─── ВЕРХНИЙ БЛОК СОСТОЯНИЯ (beta.15) ───
+  // ─── ВЕРХНИЙ БЛОК СОСТОЯНИЯ (beta.16) ───
+  // Реальные обязательные зависимости MazLiveKOTH (SHVDN3-скрипт):
+  //  GTA V Legacy → GTA5.exe
+  //  ScriptHookV  → ScriptHookV.dll + dinput8.dll (ASI Loader)
+  //  SHVDN 3      → ScriptHookVDotNet.asi + ScriptHookVDotNet3.dll
   function updateDeps(deps){
-    const map = { 'GTA5.exe':'gameExe', 'ScriptHookV':'scriptHookV', 'ScriptHookVDotNet':'scriptHookVDotNet' }
+    const f = (deps && deps.files) || {}
+    // Теги шага 2 — по каждому компоненту
     const tags = $('depsTags').children
-    let i = 0
-    for(const [label, key] of Object.entries(map)){
-      const ok = deps && deps.details && deps.details[key]
-      tags[i].className = 'tag ' + (ok ? 'ok' : 'bad')
-      tags[i].textContent = (ok?'✔ ':'✖ ') + label
-      i++
+    const comps = [
+      { ok: !!f.gameExe,  txt: 'GTA5.exe' + (f.gameExe?'':' (нет)') },
+      { ok: !!(f.shvDll && f.asiLoader), txt: 'ScriptHookV' + ((f.shvDll&&f.asiLoader)?'':(' — нет: '+[!f.shvDll&&'ScriptHookV.dll',!f.asiLoader&&'dinput8.dll'].filter(Boolean).join(', '))) },
+      { ok: !!(f.shvdnAsi && f.shvdn3Dll), txt: 'ScriptHookVDotNet' + ((f.shvdnAsi&&f.shvdn3Dll)?'':(' — нет: '+[!f.shvdnAsi&&'ScriptHookVDotNet.asi',!f.shvdn3Dll&&'ScriptHookVDotNet3.dll'].filter(Boolean).join(', '))) },
+    ]
+    comps.forEach((c,i)=>{ if(tags[i]){ tags[i].className='tag '+(c.ok?'ok':'bad'); tags[i].textContent=(c.ok?'✔ ':'✖ ')+c.txt } })
+
+    // Верхний state-блок
+    const shvOk = !!(f.shvDll && f.asiLoader)
+    const shvdnOk = !!(f.shvdnAsi && f.shvdn3Dll)
+    dot($('dotSHV'), shvOk?'ok':'err'); $('vSHV').textContent = shvOk?'установлен':'не установлен'
+    dot($('dotSHVDN'), shvdnOk?'ok':'err'); $('vSHVDN').textContent = shvdnOk?'установлен':'не установлен'
+    if(deps){
+      $('depsHint').innerHTML = deps.ok
+        ? '✅ Все обязательные зависимости на месте.'
+        : ('❌ Отсутствует:<br>• ' + (deps.missingComponents||[]).filter(c=>c.id!=='GTA').map(c=>`<b>${c.label}</b> — нет: ${c.files.join(', ')}`).join('<br>• '))
     }
-    // Отдельные статусы ScriptHookV/ScriptHookVDotNet в state-блоке
-    const shv = !!(deps && deps.details && deps.details.scriptHookV)
-    const shvdn = !!(deps && deps.details && deps.details.scriptHookVDotNet)
-    dot($('dotSHV'), shv?'ok':'err'); $('vSHV').textContent = shv?'установлен':'не установлен'
-    dot($('dotSHVDN'), shvdn?'ok':'err'); $('vSHVDN').textContent = shvdn?'установлен':'не установлен'
-    if(deps) $('depsHint').textContent = deps.ok ? 'Все зависимости на месте.' : ('Отсутствует: ' + (deps.missing||[]).join(', '))
+    window.__lastDeps = deps
   }
 
-  function setModState(installed){
-    modInstalled = installed
-    dot($('dotMod'), installed?'ok':'err')
-    dot($('dotMod3'), installed?'ok':'err')
-    $('vModSetup').textContent = installed ? 'установлен' : 'не установлен'
-    $('vMod3').textContent = installed ? '✅ Установлен' : '❌ Не установлен'
-    $('bInstall').disabled = installed
-    $('bUninstall').disabled = !installed
-    $('bReinstall').disabled = !installed
+  // setModState(statusObj, depsObj) — теперь учитывает 3 состояния.
+  //  filesInstalled: скопированы файлы MazLiveKOTH
+  //  depsOk:         зависимости готовы
+  //  ready:          ✅ готов к работе (both)
+  function setModState(status, deps){
+    status = status || {}
+    const files = !!status.filesInstalled
+    const depsOk = !!(status.depsOk !== undefined ? status.depsOk : (deps && deps.ok))
+    const ready = !!status.ready
+    modInstalled = files
+
+    let label, cls
+    if(ready){ label='✅ MazLiveKOTH готов'; cls='ok' }
+    else if(files && !depsOk){ label='⚠️ Файлы мода установлены, но не хватает зависимостей'; cls='err' }
+    else if(!files && depsOk){ label='Зависимости готовы — установите мод'; cls='idle' }
+    else { label='❌ Не установлен'; cls='err' }
+
+    dot($('dotMod'), cls); dot($('dotMod3'), cls)
+    $('vModSetup').textContent = ready ? 'готов' : (files ? 'файлы установлены' : 'не установлен')
+    $('vMod3').textContent = label
+
+    // Кнопки
+    $('bInstall').disabled = files && depsOk              // можно ставить, если ещё не готов
+    $('bUninstall').disabled = !files
+    $('bReinstall').disabled = !files
   }
 
   function showState(msg, cls){
@@ -510,51 +537,105 @@
     b.innerHTML = msg
   }
 
+  // ─── DEPS_MISSING — это ШТАТНЫЙ шаг setup-wizard, а НЕ аварийная ошибка (п.TЗ) ───
+  // Показываем понятный сценарий: что отсутствует, инструкция, кнопка «Проверить снова».
+  // Никаких «Ошибка установки» — только следующий шаг.
+  function showDepsSetupState(deps){
+    deps = deps || window.__lastDeps || {};
+    const comps = (deps.missingComponents||[]).filter(c=>c.id!=='GTA')
+    const rows = comps.map(c =>
+      `<div style="margin-top:8px"><b>${c.label}</b><br>❌ Не найден<br>Отсутствуют:<br>` +
+      c.files.map(f=>`&nbsp;&nbsp;• ${f}`).join('<br>') + `</div>`
+    ).join('')
+    showState(
+      `<b>Для установки MazLiveKOTH сначала установите обязательные компоненты.</b>` +
+      (rows || '<div style="margin-top:8px">Зависимости не найдены.</div>') +
+      `<div style="margin-top:10px">Скачайте из официальных источников и положите файлы в корень GTA V (рядом с GTA5.exe). Затем нажмите «🔄 Проверить снова».</div>`,
+      'warn'
+    )
+    // Уводим пользователя к шагу 2 (зависимости) — подсветить блок, если возможно
+    try{ const el = $('depsTags'); if(el && el.scrollIntoView) el.scrollIntoView({block:'center', behavior:'smooth'}) }catch(e){}
+  }
+
   // Единая проверка состояния: GTA → deps → мод → агент → эфир.
   // НЕ зависит от roomId. Обновляет верхний блок и секвенцию кнопок.
   async function refreshSetup(){
     if(!api) { showState('API недоступен — приложение запущено не в Electron.', 'err'); return }
-    let st = null
-    try { st = await api.state() } catch(e){}
     // 1) GTA
     if(gamePath){
       try {
         const r = await api.checkPath(gamePath)
-        if(r.ok){ gamePath = r.gamePath; updateDeps(r.deps); setModState(r.modInstalled) }
-        else { gamePath = '' }
+        if(r.ok){ gamePath = r.gamePath } else { gamePath = '' }
       } catch(e){}
     }
     if(!gamePath){
-      const auto = await api.detect()
-      if(auto.found){ gamePath = auto.gamePath; updateDeps(auto.deps); setModState(auto.modInstalled) }
-      else { updateDeps(null); setModState(false) }
+      try {
+        const auto = await api.detect()
+        if(auto.found) gamePath = auto.gamePath
+      } catch(e){}
     }
+    // 2) Полный статус (deps + modStatus) из main — единый источник правды
+    let st = null
+    try { st = await api.state() } catch(e){}
+    const deps = (st && st.deps) || null
+    const modStatus = (st && st.modStatus) || null
+    updateDeps(deps)
+    setModState(modStatus, deps)
+
     $('vPath').textContent = gamePath || 'не найдена'
     $('vPath1').textContent = gamePath || 'не найдена'
     dot($('dotGta'), gamePath?'ok':'err')
     $('vGtaFound').textContent = gamePath ? '✅ Найдена' : '❌ Не найдена'
+
+    // Баннер: если что-то не хватает — объясняем ЧТО и ГДЕ взять
+    if(!gamePath){
+      showState('GTA V Legacy не найдена. Укажите папку игры (шаг 1).','warn')
+    } else if(deps && !deps.ok){
+      showDepsSetupState(deps)
+    } else if(modStatus && !modStatus.filesInstalled){
+      showState('Зависимости готовы. Нажмите «📦 Установить мод» (шаг 3).','')
+    } else if(modStatus && modStatus.ready){
+      showState('✅ MazLiveKOTH готов. Подключите агент/эфир или запустите GTA.','')
+    }
     applyGate()
   }
 
-  // Секвенция доступности кнопок по состоянию (п.8 ТЗ).
+  // Секвенция доступности кнопок по состоянию (жёсткая гейтингова логика).
   function applyGate(){
     const gta = !!gamePath
-    const depOk = !!(window.__lastDeps && window.__lastDeps.ok)
-    const mod = modInstalled
+    const deps = window.__lastDeps || {}
+    const depOk = !!deps.ok
+    const files = !!modInstalled
+    const ready = !!(window.__modReady)
     const agent = !!(window.__agentRunning)
     const stream = !!(window.__streamConnected)
 
-    // Шаг 4: агент — только при мод+ (и GTA)
-    $('bAgentStart').disabled = !(gta && mod) || agent
+    // Шаг 3: установка мода — при GTA + зависимостях, пока не готов
+    $('bInstall').disabled = !(gta && depOk) || (files && depOk)
+    // Шаг 4: агент — доступен при найденной GTA (НЕ требует ready).
+    //  GTA Agent — отдельный Node-процесс: подключается к MazLive/TikTok и полезен
+    //  для диагностики до готовности ScriptHook. Связь с игрой — через файлы мода.
+    $('bAgentStart').disabled = !gta || agent
     $('bAgentStop').disabled = !agent
     // Шаг 5: эфир — при работающем агенте
     $('bConnect').disabled = !agent
     $('bStopAll').disabled = !agent
-    // Шаг 6: тесты — при агенте (подарок/лайк/follow)
-    const testOk = agent
-    for(const id of ['tGift','tLike','tFollow','tRandom','tGiftSend']) { const el=$(id); if(el) el.disabled = !testOk }
-    // Шаг 7: запуск GTA — при мод (можно запускать и без агента)
-    $('bLaunchGta').disabled = !(gta && mod)
+    // Шаг 6: тесты — при агенте
+    for(const id of ['tGift','tLike','tFollow','tRandom','tGiftSend']) { const el=$(id); if(el) el.disabled = !agent }
+    // Шаг 7: запуск GTA — ТОЛЬКО при готовом моде (файлы + зависимости)
+    $('bLaunchGta').disabled = !(gta && ready)
+
+    // Причина, почему «Запустить GTA» выключена
+    const lh = $('launchHint')
+    if(lh){
+      if(!gta) lh.textContent = 'Сначала выберите папку GTA V Legacy (шаг 1).'
+      else if(!depOk){
+        const lack = (deps.missingComponents||[]).filter(c=>c.id!=='GTA').map(c=>c.label).join(', ')
+        lh.textContent = 'Запуск недоступен: сначала установите ' + (lack || 'зависимости') + ' (шаг 2).'
+      }
+      else if(!files) lh.textContent = 'Запуск недоступен: сначала установите мод MazLiveKOTH (шаг 3).'
+      else lh.textContent = 'Запускает GTA5.exe (Story Mode). Откройте Story Mode, а не GTA Online.'
+    }
 
     // Подсказки
     $('testHint').textContent = agent
@@ -562,21 +643,62 @@
       : 'Тесты станут доступны после запуска GTA Agent (шаг 4).'
     $('agentHint').textContent = agent
       ? 'Агент работает. Эфир можно подключить на шаге 5.'
-      : (mod ? 'Агент не запущен — нажмите «Запустить агент» (или подождите автозапуск).' : 'Сначала установите мод (шаг 3).')
-    window.__lastDeps = window.__lastDeps || null
+      : (ready ? 'Агент не запущен — нажмите «Запустить агент» (или подождите автозапуск).'
+               : (files ? 'Мод установлен, но не хватает зависимостей. Агент можно запустить для диагностики/эфира, но команды в игру не пойдут до установки ScriptHook (шаги 2).'
+                        : 'Агент можно запустить для диагностики/подключения эфира. Команды в игру заработают после установки мода и зависимостей.'))
   }
 
-  async function detect(){ const r = await api.detect(); if(r.found){ gamePath=r.gamePath; window.__lastDeps=r.deps; updateDeps(r.deps); setModState(r.modInstalled); showState('GTA найдена.', '') } else { showState('GTA V Legacy не найдена автоматически. Укажите папку вручную.', 'warn') } await refreshSetup() }
-  async function pick(){ const r = await api.selectDir(); if(r.ok){ gamePath=r.gamePath; window.__lastDeps=r.deps; updateDeps(r.deps); setModState(r.modInstalled); showState('Папка принята: подтверждена GTA V Legacy.','') } else if(r.error){ showState(r.error,'err') } await refreshSetup() }
-  async function install(){ try{ log('установка мода…'); await api.installMod(gamePath||undefined); setModState(true); log('мод установлен ✓'); await api.applyCourse(gamePath); showState('Мод установлен. Теперь запустите GTA Agent (шаг 4).','') }catch(e){ const m=humanErr(e); log('ошибка установки: '+m); showState(m, 'err') } await refreshSetup() }
-  async function uninstall(){ try{ log('удаление мода…'); await api.uninstallMod(gamePath||undefined); setModState(false); log('мод удалён'); showState('Мод удалён (backup восстановлен).','') }catch(e){ const m=humanErr(e); log('ошибка удаления: '+m); showState(m,'err') } await refreshSetup() }
-  async function reinstall(){ try{ log('переустановка мода…'); await api.uninstallMod(gamePath||undefined).catch(()=>{}); await api.installMod(gamePath||undefined); setModState(true); await api.applyCourse(gamePath); log('мод переустановлен ✓') }catch(e){ const m=humanErr(e); log('ошибка: '+m); showState(m,'err') } await refreshSetup() }
+  async function detect(){ const r = await api.detect(); if(r.found){ gamePath=r.gamePath; showState('GTA найдена.', '') } else { showState('GTA V Legacy не найдена автоматически. Укажите папку вручную.', 'warn') } await refreshSetup() }
+  async function pick(){ const r = await api.selectDir(); if(r.ok){ gamePath=r.gamePath; showState('Папка принята: подтверждена GTA V Legacy.','') } else if(r.error){ showState(r.error,'err') } await refreshSetup() }
+
+  // Установка мода. Если зависимостей нет — main вернёт DEPS_MISSING.
+  // Это НЕ ошибка, а штатное состояние визарда: показываем «что установить»
+  // и кнопки «Официальная инструкция» / «Проверить снова».
+  async function install(){
+    try{
+      log('установка мода…'); showState('Проверяем зависимости и устанавливаем мод…','')
+      const r = await api.installMod(gamePath||undefined)
+      if(r && r.modStatus) setModState(r.modStatus)
+      log('мод установлен ✓'); await api.applyCourse(gamePath)
+      await refreshSetup()   // АВТО-повторный scan после установки
+      if(r && r.modStatus && r.modStatus.ready) showState('✅ MazLiveKOTH готов к работе.','')
+    }catch(e){
+      const raw = (e && e.message) ? e.message : String(e||'')
+      log('установка: ' + (raw||humanErr(e)))
+      // DEPS_MISSING → штатный сценарий визарда (НЕ «ошибка установки»)
+      if(/DEPS_MISSING|зависимост|ScriptHookV|ScriptHookVDotNet/i.test(raw)){
+        await refreshSetup()                 // обновим deps-статусы
+        showDepsSetupState(window.__lastDeps)
+      } else {
+        showState('Не удалось установить мод: ' + humanErr(e), 'err')
+        await refreshSetup()
+      }
+    }
+  }
+  async function uninstall(){ try{ log('удаление мода…'); const r = await api.uninstallMod(gamePath||undefined); setModState({filesInstalled:false,depsOk:(window.__lastDeps||{}).ok,ready:false}); log('мод удалён (зависимости не тронуты)'); showState('Файлы MazLiveKOTH удалены. Ваши ScriptHookV/ScriptHookVDotNet не тронуты.','') }catch(e){ const m=humanErr(e); log('ошибка удаления: '+m); showState(m,'err') } await refreshSetup() }
+  async function reinstall(){
+    try{
+      log('переустановка мода…'); await api.uninstallMod(gamePath||undefined).catch(()=>{})
+      const r = await api.installMod(gamePath||undefined); if(r && r.modStatus) setModState(r.modStatus)
+      await api.applyCourse(gamePath); log('мод переустановлен ✓')
+    }catch(e){
+      const raw=(e&&e.message)||''; log('переустановка: '+(raw||humanErr(e)))
+      if(/DEPS_MISSING|зависимост|ScriptHookV|ScriptHookVDotNet/i.test(raw)){ await refreshSetup(); showDepsSetupState(window.__lastDeps) }
+      else { showState('Ошибка: '+humanErr(e),'err'); await refreshSetup() }
+    }
+  }
   async function startAgentManual(){ const el=$('bAgentStart'); if(el){el.disabled=true; el.textContent='⟳ Запуск…'} try{ const r = await api.startAgent(); if(r&&r.ok){ log('агент запущен'+(r.pid?(' · pid '+r.pid):'')); showState('GTA Agent работает.', '') } else { const m=agentErrText(r); log('агент: '+m); showState(m,'err') } }catch(e){ const m=humanErr(e); log('агент: '+m); showState('GTA Agent не удалось запустить: '+m,'err') } finally { if(el){el.textContent='▶ Запустить агент'} } await refresh() }
   async function stopAgentManual(){ try{ await api.stopAgent(); log('агент остановлен'); showState('GTA Agent остановлен.','') }catch(e){ log('stop: '+humanErr(e)) } await refresh() }
 
-  // Человеческие сообщения об ошибках вместо raw Electron exceptions (п.12 ТЗ)
+  // Человеческие сообщения об ошибках вместо raw Electron exceptions
   function humanErr(e){
     const raw = (e && e.message) ? e.message : String(e||'')
+    if(/DEPS_MISSING|зависимост/i.test(raw)) return 'Не хватает обязательных зависимостей — установите их (шаг 2).'
+    // Мост к моду: status.json отсутствует / мод не загружен в игру
+    if(/ENOENT|status\.json|Mod offline|clock skew|Incompatible mod protocol/i.test(raw))
+      return 'Мод MazLiveKOTH ещё не загружен в GTA. Команды в игру заработают после запуска GTA со Story Mode и загрузки мода.'
+    if(/Round not running|phase/i.test(raw))
+      return 'Раунд не запущен в игре. Откройте меню мода в GTA и запустите раунд (Start).'
     if(/remote method|invoke/i.test(raw)) return 'Не удалось выполнить действие в приложении. Попробуйте ещё раз.'
     if(/Агент не запущен|agent/i.test(raw)) return 'GTA Agent не запущен. Нажмите «Запустить агент» (шаг 4).'
     if(/GTA не найдена|gta-missing/i.test(raw)) return 'GTA V Legacy не найдена — выберите папку игры (шаг 1).'
@@ -589,6 +711,7 @@
     switch(r.reason){
       case 'gta-missing': return 'GTA V Legacy не найдена — выберите папку (шаг 1).'
       case 'mod-missing': return 'Мод MazLiveKOTH не установлен — установите мод (шаг 3).'
+      case 'deps-missing': return 'Не хватает зависимостей: ' + ((r.deps&&r.deps.missingComponents||[]).filter(c=>c.id!=='GTA').map(c=>c.label).join(', ')) + ' (шаг 2).'
       case 'no_username': return 'Не указан ник TikTok — введите его на шаге 5.'
       case 'subscription': return 'Нужна PRO-подписка для запуска агента.'
       case 'auth': return 'Нужно войти в аккаунт Mazlive.'
@@ -645,7 +768,24 @@
   async function saveSettings(){ const res = await api.settingsSet(getSettingsPayload()); await loadSettings(); log('настройки сохранены ✓'+(res.applied?(' · ini: '+res.applied):'')) }
   async function applyCourse(){ const res = await api.applyCourse(gamePath||undefined); if(res.ok) log('курс применён к моду: '+res.applied); else log('курс не применён (мод не установлен?)','warn'), showState('Курс не применён: мод не установлен или GTA не найдена.','warn') }
   async function resetSettings(){ await api.settingsReset(); await loadSettings(); log('настройки сброшены к дефолту') }
-  function depsHelp(){ showState('ScriptHookV и ScriptHookVDotNet скачайте с официальных источников: dev-c.com (ScriptHookV) и github.com/scripthookvdotnet (ScriptHookVDotNet). Скопируйте .asi/.dll и папку scripts в корень GTA V. Перезапустите GTA.', '') }
+  function depsHelp(){ showState('Официальные источники: <b>ScriptHookV</b> — dev-c.com/gtav/scripthookv ; <b>ScriptHookVDotNet</b> — github.com/scripthookvdotnet/scripthookvdotnet/releases.<br>Скопируйте в корень GTA V (где GTA5.exe): <b>ScriptHookV.dll</b>, <b>dinput8.dll</b>, <b>ScriptHookVDotNet.asi</b>, <b>ScriptHookVDotNet3.dll</b>. Затем нажмите «🔄 Проверить снова».', '') }
+
+  // «Проверить снова» — повторный scan БЕЗ перезапуска приложения (п.8 ТЗ).
+  // Пользователь сам положил ScriptHookV/SHVDN → нажал → UI сразу обновился.
+  async function rescan(){
+    const el = $('bRescan'); const prev = el ? el.textContent : ''
+    if(el){ el.disabled = true; el.textContent = '⟳ Проверяем…' }
+    try{
+      await refreshSetup()
+      const deps = window.__lastDeps || {}
+      if(!gamePath) showState('GTA V Legacy не найдена — выберите папку игры (шаг 1).','warn')
+      else if(!deps.ok){ showDepsSetupState(deps) }
+      else if(window.__modReady) showState('✅ Все зависимости и мод на месте — можно запускать GTA.','')
+      else showState('✅ Зависимости готовы. Осталось установить мод MazLiveKOTH (шаг 3).','')
+      log('rescan: deps.ok=' + !!deps.ok + ' ready=' + !!window.__modReady)
+    }catch(e){ log('rescan ошибка: ' + humanErr(e)) }
+    finally{ if(el){ el.disabled = false; el.textContent = prev || '🔄 Проверить снова' } }
+  }
   // Запуск GTA V Legacy через существующий IPC 'launch-game' → verifyAndLaunchGame().
   async function launchGta(){
     if(!gamePath){ showState('Сначала выберите папку GTA V Legacy (шаг 1).','warn'); return }
@@ -696,6 +836,8 @@
       window.__agentRunning = !!st.agentRunning
       window.__streamConnected = !!st.streamConnected || !!a.streamLive
       if(st.deps) window.__lastDeps = st.deps
+      // ✅ Готовность мода (файлы + зависимости) — гейт для запуска GTA и агента
+      if(st.modStatus){ window.__modReady = !!st.modStatus.ready; modInstalled = !!st.modStatus.filesInstalled }
       // GTA/путь в state-блоке
       if(st.gtaFound){ dot($('dotGta'),'ok'); $('vGtaFound').textContent='✅ Найдена' }
       dot($('dotAgent'), window.__agentRunning?'ok':'err')
@@ -718,6 +860,7 @@
   $('bUninstall').onclick = uninstall
   $('bReinstall').onclick = reinstall
   $('bDepsHelp').onclick = depsHelp
+  $('bRescan').onclick = rescan
   $('bAgentStart').onclick = startAgentManual
   $('bAgentStop').onclick = stopAgentManual
   $('bLaunchGta').onclick = launchGta
@@ -752,6 +895,9 @@
     await loadSettings()
     await refreshSetup()
     setInterval(refresh, 1000); refresh()
+    // Авто-rescan при возврате окна в фокус (безопасно: только читаем диск, ничего не меняем).
+    window.addEventListener('focus', () => { try { refreshSetup() } catch(e){} })
+    document.addEventListener('visibilitychange', () => { if(!document.hidden) { try { refreshSetup() } catch(e){} } })
   })()
 </script>
 </body>
