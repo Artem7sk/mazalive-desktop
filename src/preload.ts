@@ -34,7 +34,7 @@ contextBridge.exposeInMainWorld('mazalive', {
     detect: () => ipcRenderer.invoke('gta-detect'),
     checkPath: (gamePath: string) => ipcRenderer.invoke('gta-check-path', { gamePath }),
     selectDir: () => ipcRenderer.invoke('gta-select-dir'),
-    installMod: (gamePath?: string) => ipcRenderer.invoke('gta-install-mod', { gamePath }),
+    installMod: (gamePath?: string, force?: boolean) => ipcRenderer.invoke('gta-install-mod', { gamePath, force }),
     uninstallMod: (gamePath?: string) => ipcRenderer.invoke('gta-uninstall-mod', { gamePath }),
     state: () => ipcRenderer.invoke('gta-state'),
     command: (action: string, count = 1) => ipcRenderer.invoke('gta-agent-command', { action, count }),

@@ -24,6 +24,7 @@ import {
   getModStatus,
   installMod,
   uninstallMod,
+  syncMod,
   launchGta,
   isGtaRunning,
 } from './gta/gtaMod'
@@ -661,12 +662,13 @@ ipcMain.handle('gta-check-path', (_event, { gamePath }: { gamePath: string }) =>
   return { ok: true, gamePath: hit.gamePath, deps: dep, modInstalled }
 })
 
-ipcMain.handle('gta-install-mod', async (_event, { gamePath }: { gamePath: string }) => {
+ipcMain.handle('gta-install-mod', async (_event, { gamePath, force }: { gamePath: string; force?: boolean }) => {
   const gp = gamePath && findGtaInDir(String(gamePath)) ? findGtaInDir(String(gamePath))!.gamePath : gtaState.gamePath
   if (!gp) throw new Error('GTA не найдена')
   if (await isGtaRunning()) throw new Error('Закройте GTA перед установкой мода')
   // installMod сам бросит DEPS_MISSING, если SHV/SHVDN отсутствуют.
-  const res = installMod(gp, modSourceDir())
+  // force=true («Переустановить мод») перезаписывает файлы даже при совпадении хэшей.
+  const res = installMod(gp, modSourceDir(), !!force)
   gtaState.gamePath = gp
   const status = getModStatus(gp, modSourceDir())
   gtaState.modInstalled = !!status.filesInstalled
@@ -1039,7 +1041,34 @@ app.whenReady().then(() => {
       else createAuthWindow()
     }
   })
+
+  // ⚡ АВТО-ОБНОВЛЕНИЕ МОДА при старте (не тормозим запуск).
+  // Если приложение обновилось, а мод в GTA остался старой сборки (напр. собран под
+  // ScriptHookVDotNet3 3.7.0, «Unable to resolve API version 3.7.0») — заменяем DLL
+  // на актуальный и кладём ScriptHookVDotNet.ini. Тихо, в фоне, с бэкапом.
+  setTimeout(() => { void autoSyncModAtStartup() }, 3000)
 })
+
+/** Фоновое авто-обновление мода при запуске приложения (см. syncMod). */
+async function autoSyncModAtStartup() {
+  try {
+    if (DEV) return
+    const gp = gtaState.gamePath || autoDetectGta()?.gamePath || null
+    if (!gp || !findGtaInDir(gp)) return
+    if (!gtaState.gamePath) gtaState.gamePath = gp
+    const res = await syncMod(gp, modSourceDir())
+    if (res.changed) {
+      console.log('[ModSync] мод обновлён автоматически:', res.reason, res.actions.map((a) => `${a.file}:${a.action}`).join(', '))
+      const st = getModStatus(gp, modSourceDir())
+      gtaState.modInstalled = !!st.filesInstalled
+      mainWindow?.webContents.send('gta-state-updated', { modStatus: st })
+    } else {
+      console.log('[ModSync] без изменений:', res.reason)
+    }
+  } catch (e: any) {
+    console.log('[ModSync] ошибка авто-обновления мода:', e?.message)
+  }
+}
 
 app.on('window-all-closed', () => {
   if (gtaAgent) { try { gtaAgent.disconnect() } catch {} gtaAgent = null }

@@ -542,7 +542,8 @@
     modInstalled = files
 
     let label, cls
-    if(ready){ label='✅ Файлы и зависимости готовы'; cls='ok' }
+    if(ready && status.outdated){ label='⚠️ Мод устарел — нажмите «Переустановить»'; cls='err' }
+    else if(ready){ label='✅ Файлы и зависимости готовы'; cls='ok' }
     else if(files && !depsOk){ label='⚠️ Файлы мода установлены, но не хватает зависимостей'; cls='err' }
     else if(!files && depsOk){ label='Зависимости готовы — установите мод'; cls='idle' }
     else { label='❌ Не установлен'; cls='err' }
@@ -718,9 +719,12 @@
   async function uninstall(){ try{ log('удаление мода…'); const r = await api.uninstallMod(gamePath||undefined); setModState({filesInstalled:false,depsOk:(window.__lastDeps||{}).ok,ready:false}); log('мод удалён (зависимости не тронуты)'); showState('Файлы MazLiveKOTH удалены. Ваши ScriptHookV/ScriptHookVDotNet не тронуты.','') }catch(e){ const m=humanErr(e); log('ошибка удаления: '+m); showState(m,'err') } await refreshSetup() }
   async function reinstall(){
     try{
-      log('переустановка мода…'); await api.uninstallMod(gamePath||undefined).catch(()=>{})
-      const r = await api.installMod(gamePath||undefined); if(r && r.modStatus) setModState(r.modStatus)
+      log('переустановка мода…')
+      // force=true: перезаписываем файлы даже если хэши совпадают (со свежим бэкапом).
+      // Без предварительного удаления — чтобы обновить устаревший DLL (напр. под SHVDN 3.7).
+      const r = await api.installMod(gamePath||undefined, true); if(r && r.modStatus) setModState(r.modStatus)
       await api.applyCourse(gamePath); log('мод переустановлен ✓')
+      await refreshSetup()
     }catch(e){
       const raw=(e&&e.message)||''; log('переустановка: '+(raw||humanErr(e)))
       if(/DEPS_MISSING|зависимост|ScriptHookV|ScriptHookVDotNet/i.test(raw)){ await refreshSetup(); showDepsSetupState(window.__lastDeps) }

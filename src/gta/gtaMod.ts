@@ -211,8 +211,98 @@ function readModVersion(modSourceDir: string): string {
   } catch { return 'unknown'; }
 }
 
+/** Раскладка файлов мода в GTA (пути, которые ставит/снимает MazLive). */
+function modPaths(gamePath: string) {
+  const scriptsDir = path.join(gamePath, 'scripts');
+  const kothDir = path.join(scriptsDir, 'MazLiveKOTH');
+  return {
+    scriptsDir,
+    kothDir,
+    dll: path.join(scriptsDir, 'MazLiveKOTH.dll'),
+    settings: path.join(kothDir, 'settings.ini'),
+    marker: path.join(kothDir, '.mazlive-install.json'),
+    shvdnIni: path.join(gamePath, 'ScriptHookVDotNet.ini'),
+  };
+}
+
+/** Есть ли признаки, что мод в GTA поставлен нами (LAUNCHER): маркер или совпадение DLL. */
+export function isOurMod(gamePath: string, modSourceDir: string): boolean {
+  const p = modPaths(gamePath);
+  if (fs.existsSync(p.marker)) return true;
+  // Маркер мог не сохраниться у старых сборок — считаем «нашим», если установленный DLL
+  // побайтово совпадает с любым известным DLL мода (текущий пакет) ИЛИ имеет то же имя,
+  // что раздаёт лаунчер, и лежит в стандартном scripts/. Это безопасно: бэкап делается всегда.
+  if (fs.existsSync(p.dll)) {
+    const src = path.join(modSourceDir, 'MazLiveKOTH.dll');
+    if (fs.existsSync(src) && sha256(p.dll) === sha256(src)) return true;
+    return true; // MazLiveKOTH.dll — наше уникальное имя, чужие моды так не называются
+  }
+  return false;
+}
+
+/**
+ * Установка/обновление мода в GTA. Идемпотентно, с бэкапами.
+ *
+ * @param force  true — переустановить даже если файлы идентичны (после явного «Переустановить»).
+ * @returns actions: что реально сделано (installed / skip / backup).
+ */
+function applyModFiles(gamePath: string, modSourceDir: string, force = false) {
+  const p = modPaths(gamePath);
+  fs.mkdirSync(p.kothDir, { recursive: true });
+  const bkp = backupDir(gamePath);
+  fs.mkdirSync(bkp, { recursive: true });
+
+  const actions: ModAction[] = [];
+  let changed = false;
+  const doCopy = (srcName: string, destAbs: string, label: string) => {
+    const src = path.join(modSourceDir, srcName);
+    if (!fs.existsSync(src)) throw new Error(`Нет файла в пакете: ${srcName}`);
+    if (fs.existsSync(destAbs)) {
+      const destHash = sha256(destAbs);
+      const srcHash = sha256(src);
+      if (destHash === srcHash && !force) { actions.push({ file: label, action: 'skip (уже установлен)' }); return; }
+      const backup = path.join(bkp, path.basename(destAbs) + '.' + stamp() + '.bak');
+      fs.copyFileSync(destAbs, backup);
+      actions.push({ file: label, action: 'backup', backup });
+    }
+    fs.copyFileSync(src, destAbs);
+    actions.push({ file: label, action: force ? 'reinstalled' : 'installed' });
+    changed = true;
+  };
+
+  doCopy('MazLiveKOTH.dll', p.dll, 'scripts/MazLiveKOTH.dll');
+  doCopy('settings.ini', p.settings, 'scripts/MazLiveKOTH/settings.ini');
+
+  // ScriptHookVDotNet.ini в корень GTA — убирает [ERROR] Failed to load config в логе.
+  // НЕ перезаписываем, если пользователь уже имеет свой ini.
+  const shvdnIniSrc = path.join(modSourceDir, 'ScriptHookVDotNet.ini');
+  if (fs.existsSync(shvdnIniSrc)) {
+    if (!fs.existsSync(p.shvdnIni)) {
+      fs.copyFileSync(shvdnIniSrc, p.shvdnIni);
+      actions.push({ file: 'ScriptHookVDotNet.ini', action: 'installed' });
+      changed = true;
+    } else {
+      actions.push({ file: 'ScriptHookVDotNet.ini', action: 'skip (уже есть)' });
+    }
+  }
+
+  // Диагностика версии API: под какую ScriptHookVDotNet3 собран установленный DLL.
+  const installed = readNetVersions(p.dll);
+  const marker = {
+    installedBy: 'MAZLIVE',
+    version: readModVersion(modSourceDir),
+    at: new Date().toISOString(),
+    dllSha256: fs.existsSync(p.dll) ? sha256(p.dll) : null,
+    apiTarget: installed.refs['ScriptHookVDotNet3'] || null,
+    shvdnSelf: installed.self || null,
+    files: ['scripts/MazLiveKOTH.dll', 'scripts/MazLiveKOTH/settings.ini'],
+  };
+  fs.writeFileSync(p.marker, JSON.stringify(marker, null, 2));
+  return { actions, marker, changed };
+}
+
 /** Установка мода. ТРЕБУЕТ готовые зависимости (SHV + SHVDN3). Идемпотентно, с бэкапами. */
-export function installMod(gamePath: string, modSourceDir: string) {
+export function installMod(gamePath: string, modSourceDir: string, force = false) {
   const dep = checkDependencies(gamePath, modSourceDir);
   if (!dep.files.gameExe) throw new Error('GTA5.exe не найден в выбранной папке');
   // ⚠️ Ключевое: НЕ ставим мод без обязательных зависимостей. Иначе мод не загрузится в игре.
@@ -229,52 +319,52 @@ export function installMod(gamePath: string, modSourceDir: string) {
     err.dep = dep;
     throw err;
   }
-  const scriptsDir = path.join(gamePath, 'scripts');
-  const kothDir = path.join(scriptsDir, 'MazLiveKOTH');
-  fs.mkdirSync(kothDir, { recursive: true });
-  const bkp = backupDir(gamePath);
-  fs.mkdirSync(bkp, { recursive: true });
-
-  const actions: ModAction[] = [];
-  const doCopy = (srcName: string, destAbs: string, label: string) => {
-    const src = path.join(modSourceDir, srcName);
-    if (!fs.existsSync(src)) throw new Error(`Нет файла в пакете: ${srcName}`);
-    if (fs.existsSync(destAbs)) {
-      const destHash = sha256(destAbs);
-      const srcHash = sha256(src);
-      if (destHash === srcHash) { actions.push({ file: label, action: 'skip (уже установлен)' }); return; }
-      const backup = path.join(bkp, path.basename(destAbs) + '.' + stamp() + '.bak');
-      fs.copyFileSync(destAbs, backup);
-      actions.push({ file: label, action: 'backup', backup });
-    }
-    fs.copyFileSync(src, destAbs);
-    actions.push({ file: label, action: 'installed' });
-  };
-
-  doCopy('MazLiveKOTH.dll', path.join(scriptsDir, 'MazLiveKOTH.dll'), 'scripts/MazLiveKOTH.dll');
-  doCopy('settings.ini', path.join(kothDir, 'settings.ini'), 'scripts/MazLiveKOTH/settings.ini');
-
-  // ScriptHookVDotNet.ini в корень GTA — убирает [ERROR] Failed to load config в логе.
-  // НЕ перезаписываем, если пользователь уже имеет свой ini.
-  const shvdnIniSrc = path.join(modSourceDir, 'ScriptHookVDotNet.ini');
-  const shvdnIniDest = path.join(gamePath, 'ScriptHookVDotNet.ini');
-  if (fs.existsSync(shvdnIniSrc)) {
-    if (!fs.existsSync(shvdnIniDest)) {
-      fs.copyFileSync(shvdnIniSrc, shvdnIniDest);
-      actions.push({ file: 'ScriptHookVDotNet.ini', action: 'installed' });
-    } else {
-      actions.push({ file: 'ScriptHookVDotNet.ini', action: 'skip (уже есть)' });
-    }
-  }
-
-  const marker = {
-    installedBy: 'MAZLIVE',
-    version: readModVersion(modSourceDir),
-    at: new Date().toISOString(),
-    files: ['scripts/MazLiveKOTH.dll', 'scripts/MazLiveKOTH/settings.ini'],
-  };
-  fs.writeFileSync(path.join(kothDir, '.mazlive-install.json'), JSON.stringify(marker, null, 2));
+  const { actions, marker } = applyModFiles(gamePath, modSourceDir, force);
   return { ok: true, gamePath, actions, marker };
+}
+
+/**
+ * АВТО-ОБНОВЛЕНИЕ МОДА. Вызывается при старте приложения ДО запуска GTA.
+ *
+ * Если в GTA стоит НАШ мод (маркер или уникальное имя DLL), но его DLL отличается
+ * от packaged — делаем бэкап и заменяем на актуальный (устраняет «Unable to resolve
+ * API version 3.7.0», когда приложение обновилось, а мод остался старым).
+ *
+ * Безопасность:
+ *  - НЕ трогаем, если мод не наш (нет маркера и DLL не совпадает с пакетом — см. isOurMod);
+ *  - НЕ трогаем, если GTA запущена (замена файла под работающей игрой ломает сессию);
+ *  - НЕ ставим зависимости — если SHV/SHVDN3 нет, просто ничего не делаем (deferred: DM).
+ *
+ * @returns { changed, reason, actions }
+ */
+export async function syncMod(gamePath: string | null, modSourceDir: string, opts: { force?: boolean } = {}) {
+  const res: { changed: boolean; reason: string; actions: ModAction[] } = {
+    changed: false, reason: '', actions: [],
+  };
+  const src = path.join(modSourceDir, 'MazLiveKOTH.dll');
+  if (!gamePath || !fs.existsSync(src)) { res.reason = 'no-game-or-source'; return res; }
+  const p = modPaths(gamePath);
+  if (!fs.existsSync(p.dll)) { res.reason = 'mod-not-installed'; return res; }
+  // не наш мод — не трогаем (защита от подмены чужого/пользовательского DLL)
+  if (!isOurMod(gamePath, modSourceDir) && !opts.force) { res.reason = 'not-our-mod'; return res; }
+  // принудительная переустановка доступна и без совпадения, но GTA должна быть закрыта
+  try {
+    if (await isGtaRunning()) { res.reason = 'gta-running'; return res; }
+  } catch { /* если не смогли проверить процесс — перестраховываемся и выходим */
+    res.reason = 'cannot-check-process'; return res;
+  }
+  const dep = checkDependencies(gamePath, modSourceDir);
+  if (!dep.ok) { res.reason = 'deps-missing'; return res; }
+
+  const installedHash = sha256(p.dll);
+  const srcHash = sha256(src);
+  if (installedHash === srcHash && !opts.force) { res.reason = 'up-to-date'; return res; }
+
+  const out = applyModFiles(gamePath, modSourceDir, !!opts.force);
+  res.changed = true;
+  res.actions = out.actions;
+  res.reason = 'updated';
+  return res;
 }
 
 /**
@@ -344,6 +434,14 @@ export interface ModStatus {
   deps: DepCheck;
   /** Компоненты, которых не хватает для «готов». */
   missingComponents: DepCheck['missingComponents'];
+  /** Мод установлен НАШИМ лаунчером (маркер или узнаваемый DLL) — значит auto-update разрешён. */
+  managed: boolean;
+  /** Установленный DLL отличается от актуального в приложении (нужно обновление). */
+  outdated: boolean;
+  /** SHA256 установленного DLL (если есть). */
+  installedSha256: string | null;
+  /** Под какую ScriptHookVDotNet3 собран установленный DLL (напр. "3.6.0.0"). */
+  installedApiTarget: string | null;
 }
 
 /**
@@ -355,10 +453,20 @@ export interface ModStatus {
 export function getModStatus(gamePath: string | null, modSourceDir: string): ModStatus {
   const deps = checkDependencies(gamePath, modSourceDir);
   let filesInstalled = false;
+  let managed = false;
+  let outdated = false;
+  let installedSha256: string | null = null;
+  let installedApiTarget: string | null = null;
   if (gamePath) {
-    const dll = path.join(gamePath, 'scripts', 'MazLiveKOTH.dll');
-    const marker = path.join(gamePath, 'scripts', 'MazLiveKOTH', '.mazlive-install.json');
-    filesInstalled = fs.existsSync(dll) || fs.existsSync(marker);
+    const p = modPaths(gamePath);
+    filesInstalled = fs.existsSync(p.dll) || fs.existsSync(p.marker);
+    managed = filesInstalled && isOurMod(gamePath, modSourceDir);
+    if (fs.existsSync(p.dll)) {
+      installedSha256 = sha256(p.dll);
+      const srcDll = path.join(modSourceDir, 'MazLiveKOTH.dll');
+      if (fs.existsSync(srcDll)) outdated = installedSha256 !== sha256(srcDll);
+      installedApiTarget = readNetVersions(p.dll).refs['ScriptHookVDotNet3'] || null;
+    }
   }
   const missingComponents = deps.missingComponents;
   return {
@@ -367,5 +475,9 @@ export function getModStatus(gamePath: string | null, modSourceDir: string): Mod
     ready: filesInstalled && deps.ok,
     deps,
     missingComponents,
+    managed,
+    outdated,
+    installedSha256,
+    installedApiTarget,
   };
 }
