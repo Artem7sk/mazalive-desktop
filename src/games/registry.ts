@@ -19,6 +19,14 @@ export interface GameEntry {
   title: string
   /** Для desktop-game: нужен ли локальный агент (по умолчанию true для desktop-game). */
   requiresDesktopAgent?: boolean
+  /**
+   * Нестандартный путь на game-server (для web-game).
+   * По умолчанию: `/games/<slug>`. Для MIRA — `/ai-host/stage.html`.
+   * К нему добавляются query-параметры ?room=&token=&lang=.
+   */
+  webPath?: string
+  /** Открывать ли на весь экран (для эфирного окна ведущей). */
+  fullscreen?: boolean
 }
 
 /** Реестр desktop-игр (web-игры приходят из дашборда, здесь только то, что нужно лаунчеру). */
@@ -28,6 +36,14 @@ export const DESKTOP_GAMES: Record<string, GameEntry> = {
     type: 'desktop-game',
     title: 'GTA V — Царь горы',
     requiresDesktopAgent: true,
+  },
+  // MIRA — виртуальная 3D-ведущая (web-game с нестандартным путём)
+  'ai-host': {
+    slug: 'ai-host',
+    type: 'web-game',
+    title: 'Мира — AI Host',
+    webPath: '/ai-host/stage.html',
+    fullscreen: true,
   },
 }
 
@@ -51,4 +67,14 @@ export function requiresDesktopAgent(slug: string): boolean {
   if (!e) return false
   if (e.requiresDesktopAgent !== undefined) return e.requiresDesktopAgent
   return resolveType(e) === 'desktop-game'
+}
+
+/** Нестандартный путь на game-server (если задан в реестре). */
+export function gameWebPath(slug: string): string | undefined {
+  return DESKTOP_GAMES[slug]?.webPath
+}
+
+/** Нужно ли открывать окно на весь экран. */
+export function gameFullscreen(slug: string): boolean {
+  return !!DESKTOP_GAMES[slug]?.fullscreen
 }

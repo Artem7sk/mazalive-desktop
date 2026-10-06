@@ -15,7 +15,7 @@ import axios from 'axios'
 // бросает при невалидной версии приложения, и это уронило бы весь main-процесс.
 // В упакованном виде версия валидна, но защищаемся от любых сбоев апдейтера.
 import { tokenStore } from './auth/tokenStore'
-import { isDesktopGame, requiresDesktopAgent } from './games/registry'
+import { isDesktopGame, requiresDesktopAgent, gameWebPath, gameFullscreen } from './games/registry'
 import { gtaSettings, MOD_ACTIONS } from './settings/gtaSettings'
 import {
   autoDetectGta,
@@ -174,20 +174,11 @@ function createMainWindow() {
   mainWindow.setMenuBarVisibility(false)
   mainWindow.setAutoHideMenuBar(true)
 
-  // ─── БЕТА: карточка локальной игры «GTA V — Царь горы» ───
-  // Каталог приходит с production-сайта, поэтому карточку добавляем СРЕДСТВАМИ БЕТЫ
-  // (инъекция в DOM главного окна). Production-файлы НЕ меняются.
-  // Кнопка «Запуск» вызывает узкий IPC беты (window.mazalive.gta.openPanel).
-  mainWindow.webContents.on('did-finish-load', () => {
-    // Когда открыта панель мода — карточку не инжектим (это не кабинет).
-    if (gtaPanelOpen) return
-    scheduleGtaCardInjection()
-  })
-  // SPA-переходы внутри кабинета: повторяем инъекцию
-  mainWindow.webContents.on('did-navigate-in-page', () => {
-    if (gtaPanelOpen) return
-    scheduleGtaCardInjection()
-  })
+  // ─── BETA.14: GTA-карточка приходит с production-сайта (каталог) ───
+  // DOM-инъекция удалена: карточка gta-koth (data-game-slug="gta-koth")
+  // рендерится сайтом, а её кнопка «Запустить» внутри Electron вызывает
+  // window.mazalive.gta.openPanel() (см. handleLaunchDesktop в GameCard).
+  // Дуального источника карточки больше нет — ровно ОДНА карточка GTA.
 
   if (DEV) {
     mainWindow.webContents.openDevTools()
@@ -196,105 +187,6 @@ function createMainWindow() {
   mainWindow.on('closed', () => {
     mainWindow = null
   })
-}
-
-/**
- * Надёжная инъекция карточки: каталог рендерится React'ом асинхронно,
- * поэтому пробуем несколько раз с интервалом, пока карточка не появится.
- */
-function scheduleGtaCardInjection(attempt = 0) {
-  setTimeout(async () => {
-    const ok = await injectGtaCard()
-    if (ok) {
-      if (attempt === 0 || attempt === 12) console.log('[beta] GTA-карточка добавлена в каталог')
-      return
-    }
-    if (attempt < 12) scheduleGtaCardInjection(attempt + 1)
-    else console.log('[beta] GTA-карточка: каталог не найден (возможно, пользователь не залогинен)')
-  }, attempt === 0 ? 1200 : 800)
-}
-
-/**
- * Инъекция карточки «GTA V — Царь горы» в каталог production-дашборда.
- * Идемпотентно: повторный вызов не создаёт дубликат. Полностью изолировано от прода —
- * меняется только DOM в окне беты. Возвращает true, если карточка присутствует.
- */
-async function injectGtaCard(): Promise<boolean> {
-  if (!mainWindow || mainWindow.isDestroyed()) return false
-  // Обложку читаем В MAIN (в браузере нет fs) → передаём готовый CSS-фон в инъекцию.
-  let coverCss = ''
-  try {
-    const coverPath = path.join(__dirname, '..', 'assets', 'gta-cover.jpg')
-    if (fs.existsSync(coverPath)) {
-      const b64 = fs.readFileSync(coverPath).toString('base64')
-      coverCss = `background:linear-gradient(180deg, rgba(13,17,23,.1) 0%, rgba(13,17,23,.82) 60%, rgba(13,17,23,.96) 100%), url('data:image/jpeg;base64,${b64}');background-size:cover;background-position:center;`
-    } else {
-      coverCss = 'background:linear-gradient(135deg,#a855f7,#3b82f6);'
-    }
-  } catch {
-    coverCss = 'background:linear-gradient(135deg,#a855f7,#3b82f6);'
-  }
-  // Ник эфира (для ярлыка кнопки)
-  let nick = ''
-  try { nick = await getTikTokUsername() } catch {}
-  const btnLabel = nick ? '🔴 Подключить эфир' : '▶ Настроить мод'
-  const script = `(() => {
-    if (document.getElementById('__beta_gta_card')) return true;
-    // Ищем сетку каталога игр: контейнер с НАИБОЛЬШИМ числом карточек,
-    // содержащих кнопки «Запустить/Запуск/Launch».
-    const btns = Array.from(document.querySelectorAll('button, a'))
-      .filter(el => /запустить|запуск|launch/i.test((el.textContent || '').trim()));
-    if (!btns.length) return false;
-    const counts = new Map();
-    for (const b of btns) {
-      const g = b.closest('div.grid') || b.closest('div[class*="grid-cols-3"]');
-      if (g) counts.set(g, (counts.get(g) || 0) + 1);
-    }
-    if (!counts.size) return false;
-    // Берём сетку с максимумом игровых карточек (каталог), а не случайный grid.
-    let grid = null, best = -1;
-    for (const [g, n] of counts) { if (n > best) { best = n; grid = g; } }
-    if (!grid) return false;
-
-    const card = document.createElement('div');
-    card.id = '__beta_gta_card';
-    card.className = grid.firstElementChild ? grid.firstElementChild.className : '';
-    card.style.position = 'relative';
-    card.style.overflow = 'hidden';
-    card.innerHTML = \`
-      <div style="${coverCss}position:absolute;inset:0;z-index:0"></div>
-      <div style="position:relative;z-index:1;padding:14px;display:flex;flex-direction:column;justify-content:flex-end;min-height:120px">
-      <div style="font-weight:800;font-size:15px;margin-bottom:6px;color:#fff;text-shadow:0 1px 8px rgba(0,0,0,.9)">GTA V — Царь горы <span style="font-size:10px;background:linear-gradient(135deg,#a855f7,#3b82f6);color:#fff;padding:2px 7px;border-radius:99px;vertical-align:middle">BETA</span></div>
-      <div style="font-size:12px;color:#e6edf3;line-height:1.5;margin-bottom:12px;text-shadow:0 1px 6px rgba(0,0,0,.9)">Локальная игра: подарки, лайки и follow управляют боем в GTA V (Story Mode). Работает на этом ПК.</div>
-      <div style="display:flex;align-items:center;justify-content:space-between">
-        <span style="font-size:10px;padding:3px 8px;border-radius:99px;background:rgba(168,85,247,.25);border:1px solid rgba(168,85,247,.55);color:#e9d5ff">🔒 PRO</span>
-        <button id="__beta_gta_launch" style="background:linear-gradient(135deg,#a855f7,#3b82f6);color:#fff;border:none;padding:7px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600">${btnLabel}</button>
-      </div>
-      </div>\`;
-    grid.appendChild(card);
-    card.querySelector('#__beta_gta_launch').addEventListener('click', async (e) => {
-      e.preventDefault(); e.stopPropagation();
-      const b = e.currentTarget; const old = b.textContent; b.disabled = true; b.textContent = '⟳ Проверяем…';
-      try {
-        const r = await window.mazalive.gta.openPanel();
-        if (r && r.ok === false) {
-          // Диалог «нужна подписка/вход» уже показан нативным окном (main).
-          b.textContent = r.reason === 'subscription' ? '🔒 Нужна PRO' : (r.reason === 'auth' ? '🔑 Войти' : '⚠ Ошибка');
-          setTimeout(() => { b.disabled = false; b.textContent = old; }, 1600);
-          return;
-        }
-      } catch (err) { console.error('gta openPanel', err); }
-      b.textContent = '▶ Открыто';
-      setTimeout(() => { b.disabled = false; b.textContent = old; }, 1200);
-    });
-    return true;
-  })()`
-  try {
-    const ok = await mainWindow.webContents.executeJavaScript(script, true)
-    return !!ok
-  } catch {
-    return false
-  }
 }
 
 // =============================================================
@@ -341,8 +233,13 @@ async function createGameWindow(gameSlug: string, roomId: string, roomToken: str
       if (mc && mc.length && mc[0].value) lang = mc[0].value
     }
   } catch (e) {}
-  const gameUrl = `${GAME_SERVER_URL}/games/${gameSlug}?room=${roomId}&token=${encodeURIComponent(roomToken)}&lang=${lang}`
+  const customPath = gameWebPath(gameSlug)
+  const isFullscreen = gameFullscreen(gameSlug)
+  const gameUrl = customPath
+    ? `${GAME_SERVER_URL}${customPath}?room=${roomId}&token=${encodeURIComponent(roomToken)}&lang=${lang}`
+    : `${GAME_SERVER_URL}/games/${gameSlug}?room=${roomId}&token=${encodeURIComponent(roomToken)}&lang=${lang}`
   gameWindow.loadURL(gameUrl)
+  if (isFullscreen) gameWindow.setFullScreen(true)
 
   // Блокируем открытие новых окон из игры
   gameWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
