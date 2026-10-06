@@ -110,94 +110,88 @@
     </div>
   </div>
 
-  <!-- ═══════════════ ЕДИНЫЙ ЭКРАН-ВИЗАРД (beta.15) ═══════════════
-       Всегда показываем реальные состояния и пошаговую установку.
-       roomId больше НЕ скрывает установку/диагностику. -->
-  <div id="wizard">
-
-    <!-- ВЕРХНИЙ БЛОК: Состояние GTA -->
-    <div class="card state-card">
-      <h2>Состояние GTA</h2>
-      <div class="row"><span class="label"><span id="dotGta" class="dot idle"></span>GTA V Legacy</span><span class="val" id="vGtaFound">—</span></div>
-      <div class="row"><span class="label">Путь</span><span class="val" id="vPath">—</span></div>
-      <div class="row"><span class="label"><span id="dotSHV" class="dot idle"></span>ScriptHookV</span><span class="val" id="vSHV">—</span></div>
-      <div class="row"><span class="label"><span id="dotSHVDN" class="dot idle"></span>ScriptHookVDotNet</span><span class="val" id="vSHVDN">—</span></div>
-      <div class="row"><span class="label"><span id="dotMod" class="dot idle"></span>MazLiveKOTH</span><span class="val" id="vModSetup">—</span></div>
-      <div class="row"><span class="label"><span id="dotAgent" class="dot idle"></span>MazLive GTA Agent</span><span class="val" id="vAgent">—</span></div>
-      <div class="row"><span class="label"><span id="dotStream" class="dot idle"></span>TikTok эфир</span><span class="val" id="vStream">—</span></div>
-      <div id="stateBanner" class="banner" style="margin-top:10px">Проверяем состояние…</div>
-    </div>
+  <!-- ЭКРАН 1: ОНБОРДИНГ / УСТАНОВКА -->
+  <div id="setup">
+    <div id="setupBanner" class="banner">Проверяем GTA V Legacy на этом компьютере…</div>
 
     <div class="card">
-      <h2>1 · Папка игры GTA V Legacy</h2>
+      <h2>1 · Папка игры</h2>
       <div class="row">
         <span class="label">Путь</span>
-        <span class="val" id="vPath1">—</span>
+        <span class="val" id="vPath">—</span>
       </div>
       <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:8px">
         <button id="bAuto">🔍 Найти автоматически</button>
-        <button id="bPick">📁 Выбрать папку GTA V Legacy</button>
+        <button id="bPick">📁 Выбрать папку…</button>
       </div>
-      <div class="small" style="margin-top:8px">Принимается только настоящая GTA V Legacy (GTA5.exe + PlayGTAV.exe + update\ + x64\). Enhanced/Online не поддерживается.</div>
     </div>
 
     <div class="card">
-      <h2>2 · Зависимости мода</h2>
+      <h2>2 · Зависимости</h2>
       <div class="tags" id="depsTags">
         <span class="tag">GTA5.exe</span>
         <span class="tag">ScriptHookV</span>
         <span class="tag">ScriptHookVDotNet</span>
       </div>
       <div class="small" id="depsHint" style="margin-top:8px">Выберите папку игры, чтобы проверить зависимости.</div>
-      <div class="grid" style="grid-template-columns:1fr;margin-top:8px">
-        <button id="bDepsHelp">📖 Как установить ScriptHookV / ScriptHookVDotNet</button>
-      </div>
-      <div class="small" style="margin-top:6px">Зависимости распространяются их авторами — качаем только из официальных источников.</div>
     </div>
 
     <div class="card">
       <h2>3 · Мод MazLiveKOTH</h2>
       <div class="row">
-        <span class="label"><span id="dotMod3" class="dot idle"></span>Статус мода</span>
-        <span class="val" id="vMod3">—</span>
+        <span class="label"><span id="dotMod" class="dot idle"></span>Статус мода</span>
+        <span class="val" id="vModSetup">—</span>
       </div>
       <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:8px">
-        <button class="primary" id="bInstall">📦 Установить мод</button>
+        <button class="primary" id="bInstall">⬇️ Установить мод</button>
         <button class="danger" id="bUninstall">🗑 Удалить мод</button>
-      </div>
-      <div class="grid" style="grid-template-columns:1fr;margin-top:8px">
-        <button id="bReinstall">🔄 Переустановить мод</button>
       </div>
       <div class="small" style="margin-top:8px">Мод только для Story Mode (GTA Online не используется). Перед установкой закройте GTA.</div>
     </div>
+  </div>
 
+  <!-- ЭКРАН 2: РАБОЧАЯ ПАНЕЛЬ -->
+  <div id="main" class="hidden">
     <div class="card">
-      <h2>4 · GTA Agent</h2>
-      <div class="row"><span class="label"><span id="dotAgent4" class="dot idle"></span>Статус</span><span class="val" id="vAgent4">🔴 Остановлен</span></div>
-      <div class="row"><span class="label">PID</span><span class="val" id="vAgentPid">—</span></div>
-      <div class="grid" style="grid-template-columns:1fr 1fr;margin-top:8px">
-        <button class="primary" id="bAgentStart">▶ Запустить агент</button>
-        <button id="bAgentStop">⏹ Остановить агент</button>
-      </div>
-      <div class="small" id="agentHint" style="margin-top:8px">Агент запускается автоматически при открытии панели, если мод установлен.</div>
+      <div class="row"><span class="label"><span id="dotConn" class="dot idle"></span>Соединение с MazLive</span><span class="val" id="vConn">—</span></div>
+      <div class="row"><span class="label"><span id="dotStream" class="dot idle"></span>Эфир</span><span class="val" id="vStream">—</span></div>
+      <div class="row"><span class="label"><span id="dotMod2" class="dot idle"></span>Мод</span><span class="val" id="vMod">—</span></div>
+      <div class="row"><span class="label"><span id="dotPhase" class="dot idle"></span>Раунд</span><span class="val" id="vPhase">—</span></div>
+      <div class="progress"><i id="prog"></i></div>
     </div>
 
     <div class="card">
-      <h2>5 · TikTok эфир</h2>
-      <div class="row"><span class="label"><span id="dotStream5" class="dot idle"></span>Статус</span><span class="val" id="vStream5">⚪ не подключён</span></div>
+      <div class="grid" style="grid-template-columns:repeat(4,1fr)">
+        <div class="stat"><div class="n" id="sWin">0</div><div class="t">Победы</div></div>
+        <div class="stat"><div class="n" id="sFall">0</div><div class="t">Падения</div></div>
+        <div class="stat"><div class="n" id="sObj">0</div><div class="t">Объекты</div></div>
+        <div class="stat"><div class="n" id="sQueue">0</div><div class="t">Очередь</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Эфир (TikTok)</h2>
       <div class="inline" style="margin-bottom:8px">
         <div class="field" style="flex:1"><label class="label">Твой ник TikTok</label><input id="streamUser" type="text" placeholder="например: artem_live"/></div>
       </div>
       <div class="grid" style="grid-template-columns:1fr 1fr">
         <button class="primary" id="bConnect">🔴 Подключить эфир</button>
-        <button id="bStopAll">⏹ Отключить эфир</button>
+        <button id="bStopAll">⏹ Остановить</button>
       </div>
-      <div class="small" style="margin-top:8px">Комната = твой ник (тот же, что в дашборде). Подарки/лайки/подписки заходят в игру автоматически.</div>
+      <div class="small" style="margin-top:8px">Подписки/подарки/лайки заходят в игру автоматически. Комната = твой ник (тот же, что в дашборде).</div>
     </div>
 
     <div class="card">
-      <h2>6 · Проверка и тест</h2>
-      <div class="small" id="testHint" style="margin-bottom:8px">Тесты доступны после запуска агента и подключения эфира.</div>
+      <h2>Управление раундом</h2>
+      <div class="grid" style="grid-template-columns:repeat(4,1fr)">
+        <button class="primary" id="cStart">▶ Старт</button>
+        <button id="cStop">⏹ Стоп</button>
+        <button id="cClear">🧹 Очистить</button>
+        <button id="cReset">↺ Сброс</button>
+      </div>
+      <hr/>
+      <div class="label" style="margin-bottom:6px">🧪 Тест зрителя — имитация событий (без эфира)</div>
+      <div class="small" style="margin-bottom:8px;color:var(--muted)">Проверяет правила как будто пришёл подарок/лайк/подписка. Работает после «Подключить эфир».</div>
       <div class="grid" style="grid-template-columns:1fr 1fr">
         <button id="tGift">🎁 Подарок</button>
         <button id="tLike">❤️ Лайки</button>
@@ -221,21 +215,16 @@
         </div>
         <button id="tGiftSend">▶ Отправить подарок</button>
       </div>
-    </div>
-
-    <div class="card">
-      <h2>7 · Игра</h2>
-      <div class="grid" style="grid-template-columns:1fr">
-        <button class="primary" id="bLaunchGta">▶ Запустить GTA V Legacy</button>
-      </div>
-      <div class="small" id="launchHint" style="margin-top:8px">Запускает GTA5.exe (Story Mode). Убедитесь, что открыт Story Mode, а не GTA Online.</div>
       <hr/>
-      <div class="label" style="margin-bottom:6px">Управление раундом</div>
-      <div class="grid" style="grid-template-columns:repeat(4,1fr)">
-        <button id="cStart">▶ Старт</button>
-        <button id="cStop">⏹ Стоп</button>
-        <button id="cClear">🧹 Очистить</button>
-        <button id="cReset">↺ Сброс</button>
+      <div class="label" style="margin-bottom:6px">Прямая команда моду (отладка)</div>
+      <div class="inline">
+        <div class="field">
+          <select id="testAction">
+            <option value="car">car</option>
+          </select>
+        </div>
+        <div class="field" style="max-width:90px"><input id="testCount" type="number" min="1" max="12" value="1"/></div>
+        <button class="primary" id="bTest">▶ Отправить</button>
       </div>
     </div>
   </div>
@@ -473,7 +462,6 @@
     }
   }
 
-  // ─── ВЕРХНИЙ БЛОК СОСТОЯНИЯ (beta.15) ───
   function updateDeps(deps){
     const map = { 'GTA5.exe':'gameExe', 'ScriptHookV':'scriptHookV', 'ScriptHookVDotNet':'scriptHookVDotNet' }
     const tags = $('depsTags').children
@@ -484,134 +472,64 @@
       tags[i].textContent = (ok?'✔ ':'✖ ') + label
       i++
     }
-    // Отдельные статусы ScriptHookV/ScriptHookVDotNet в state-блоке
-    const shv = !!(deps && deps.details && deps.details.scriptHookV)
-    const shvdn = !!(deps && deps.details && deps.details.scriptHookVDotNet)
-    dot($('dotSHV'), shv?'ok':'err'); $('vSHV').textContent = shv?'установлен':'не установлен'
-    dot($('dotSHVDN'), shvdn?'ok':'err'); $('vSHVDN').textContent = shvdn?'установлен':'не установлен'
     if(deps) $('depsHint').textContent = deps.ok ? 'Все зависимости на месте.' : ('Отсутствует: ' + (deps.missing||[]).join(', '))
   }
 
   function setModState(installed){
     modInstalled = installed
     dot($('dotMod'), installed?'ok':'err')
-    dot($('dotMod3'), installed?'ok':'err')
+    dot($('dotMod2'), installed?'ok':'err')
     $('vModSetup').textContent = installed ? 'установлен' : 'не установлен'
-    $('vMod3').textContent = installed ? '✅ Установлен' : '❌ Не установлен'
     $('bInstall').disabled = installed
     $('bUninstall').disabled = !installed
-    $('bReinstall').disabled = !installed
+    $('bRun').disabled = !installed
   }
 
-  function showState(msg, cls){
-    const b = $('stateBanner')
-    if(!b) return
+  function showSetup(msg, cls){
+    const b = $('setupBanner')
     b.className = 'banner' + (cls?' '+cls:'')
     b.innerHTML = msg
   }
 
-  // Единая проверка состояния: GTA → deps → мод → агент → эфир.
-  // НЕ зависит от roomId. Обновляет верхний блок и секвенцию кнопок.
   async function refreshSetup(){
-    if(!api) { showState('API недоступен — приложение запущено не в Electron.', 'err'); return }
-    let st = null
-    try { st = await api.state() } catch(e){}
-    // 1) GTA
+    if(!api) { showSetup('API недоступен — приложение запущено не в Electron.', 'err'); return }
+    // 1) известный путь из параметров
     if(gamePath){
-      try {
-        const r = await api.checkPath(gamePath)
-        if(r.ok){ gamePath = r.gamePath; updateDeps(r.deps); setModState(r.modInstalled) }
-        else { gamePath = '' }
-      } catch(e){}
+      const r = await api.checkPath(gamePath)
+      if(r.ok){ gamePath = r.gamePath; $('vPath').textContent = gamePath; updateDeps(r.deps); setModState(r.modInstalled); showSetup('GTA найдена. Проверьте зависимости и мод.', '') ; return }
     }
-    if(!gamePath){
-      const auto = await api.detect()
-      if(auto.found){ gamePath = auto.gamePath; updateDeps(auto.deps); setModState(auto.modInstalled) }
-      else { updateDeps(null); setModState(false) }
-    }
-    $('vPath').textContent = gamePath || 'не найдена'
-    $('vPath1').textContent = gamePath || 'не найдена'
-    dot($('dotGta'), gamePath?'ok':'err')
-    $('vGtaFound').textContent = gamePath ? '✅ Найдена' : '❌ Не найдена'
-    applyGate()
+    // 2) автоопределение
+    const auto = await api.detect()
+    if(auto.found){ gamePath = auto.gamePath; $('vPath').textContent = gamePath; updateDeps(auto.deps); setModState(auto.modInstalled); showSetup('GTA найдена автоматически.', ''); }
+    else { $('vPath').textContent = 'не найдена'; showSetup('GTA V Legacy не найдена. Укажите папку игры вручную (кнопка ниже).', 'warn'); setModState(false) }
   }
 
-  // Секвенция доступности кнопок по состоянию (п.8 ТЗ).
-  function applyGate(){
-    const gta = !!gamePath
-    const depOk = !!(window.__lastDeps && window.__lastDeps.ok)
-    const mod = modInstalled
-    const agent = !!(window.__agentRunning)
-    const stream = !!(window.__streamConnected)
-
-    // Шаг 4: агент — только при мод+ (и GTA)
-    $('bAgentStart').disabled = !(gta && mod) || agent
-    $('bAgentStop').disabled = !agent
-    // Шаг 5: эфир — при работающем агенте
-    $('bConnect').disabled = !agent
-    $('bStopAll').disabled = !agent
-    // Шаг 6: тесты — при агенте (подарок/лайк/follow)
-    const testOk = agent
-    for(const id of ['tGift','tLike','tFollow','tRandom','tGiftSend']) { const el=$(id); if(el) el.disabled = !testOk }
-    // Шаг 7: запуск GTA — при мод (можно запускать и без агента)
-    $('bLaunchGta').disabled = !(gta && mod)
-
-    // Подсказки
-    $('testHint').textContent = agent
-      ? (stream ? 'Агент и эфир готовы — отправляйте тестовые события.' : 'Агент работает. Подключите эфир для боевого режима (тесты работают и без эфира).')
-      : 'Тесты станут доступны после запуска GTA Agent (шаг 4).'
-    $('agentHint').textContent = agent
-      ? 'Агент работает. Эфир можно подключить на шаге 5.'
-      : (mod ? 'Агент не запущен — нажмите «Запустить агент» (или подождите автозапуск).' : 'Сначала установите мод (шаг 3).')
-    window.__lastDeps = window.__lastDeps || null
-  }
-
-  async function detect(){ const r = await api.detect(); if(r.found){ gamePath=r.gamePath; window.__lastDeps=r.deps; updateDeps(r.deps); setModState(r.modInstalled); showState('GTA найдена.', '') } else { showState('GTA V Legacy не найдена автоматически. Укажите папку вручную.', 'warn') } await refreshSetup() }
-  async function pick(){ const r = await api.selectDir(); if(r.ok){ gamePath=r.gamePath; window.__lastDeps=r.deps; updateDeps(r.deps); setModState(r.modInstalled); showState('Папка принята: подтверждена GTA V Legacy.','') } else if(r.error){ showState(r.error,'err') } await refreshSetup() }
-  async function install(){ try{ log('установка мода…'); await api.installMod(gamePath||undefined); setModState(true); log('мод установлен ✓'); await api.applyCourse(gamePath); showState('Мод установлен. Теперь запустите GTA Agent (шаг 4).','') }catch(e){ const m=humanErr(e); log('ошибка установки: '+m); showState(m, 'err') } await refreshSetup() }
-  async function uninstall(){ try{ log('удаление мода…'); await api.uninstallMod(gamePath||undefined); setModState(false); log('мод удалён'); showState('Мод удалён (backup восстановлен).','') }catch(e){ const m=humanErr(e); log('ошибка удаления: '+m); showState(m,'err') } await refreshSetup() }
-  async function reinstall(){ try{ log('переустановка мода…'); await api.uninstallMod(gamePath||undefined).catch(()=>{}); await api.installMod(gamePath||undefined); setModState(true); await api.applyCourse(gamePath); log('мод переустановлен ✓') }catch(e){ const m=humanErr(e); log('ошибка: '+m); showState(m,'err') } await refreshSetup() }
-  async function startAgentManual(){ const el=$('bAgentStart'); if(el){el.disabled=true; el.textContent='⟳ Запуск…'} try{ const r = await api.startAgent(); if(r&&r.ok){ log('агент запущен'+(r.pid?(' · pid '+r.pid):'')); showState('GTA Agent работает.', '') } else { const m=agentErrText(r); log('агент: '+m); showState(m,'err') } }catch(e){ const m=humanErr(e); log('агент: '+m); showState('GTA Agent не удалось запустить: '+m,'err') } finally { if(el){el.textContent='▶ Запустить агент'} } await refresh() }
-  async function stopAgentManual(){ try{ await api.stopAgent(); log('агент остановлен'); showState('GTA Agent остановлен.','') }catch(e){ log('stop: '+humanErr(e)) } await refresh() }
-
-  // Человеческие сообщения об ошибках вместо raw Electron exceptions (п.12 ТЗ)
-  function humanErr(e){
-    const raw = (e && e.message) ? e.message : String(e||'')
-    if(/remote method|invoke/i.test(raw)) return 'Не удалось выполнить действие в приложении. Попробуйте ещё раз.'
-    if(/Агент не запущен|agent/i.test(raw)) return 'GTA Agent не запущен. Нажмите «Запустить агент» (шаг 4).'
-    if(/GTA не найдена|gta-missing/i.test(raw)) return 'GTA V Legacy не найдена — выберите папку игры (шаг 1).'
-    if(/мод|mod-missing/i.test(raw)) return 'Мод MazLiveKOTH не установлен — установите мод (шаг 3).'
-    if(/Закройте GTA/i.test(raw)) return 'Закройте GTA перед установкой/удалением мода.'
-    return raw || 'Неизвестная ошибка'
-  }
-  function agentErrText(r){
-    if(!r) return 'GTA Agent не запущен.'
-    switch(r.reason){
-      case 'gta-missing': return 'GTA V Legacy не найдена — выберите папку (шаг 1).'
-      case 'mod-missing': return 'Мод MazLiveKOTH не установлен — установите мод (шаг 3).'
-      case 'no_username': return 'Не указан ник TikTok — введите его на шаге 5.'
-      case 'subscription': return 'Нужна PRO-подписка для запуска агента.'
-      case 'auth': return 'Нужно войти в аккаунт Mazlive.'
-      default: return r.error || 'GTA Agent не удалось запустить.'
-    }
-  }
+  async function detect(){ const r = await api.detect(); if(r.found){ gamePath=r.gamePath; $('vPath').textContent=gamePath; updateDeps(r.deps); setModState(r.modInstalled); showSetup('GTA найдена.', '') } else showSetup('Не найдена автоматически. Выберите папку вручную.', 'warn') }
+  async function pick(){ const r = await api.selectDir(); if(r.ok){ gamePath=r.gamePath; $('vPath').textContent=gamePath; updateDeps(r.deps); setModState(r.modInstalled); showSetup('Папка принята.','') } else if(r.error){ showSetup(r.error,'err') } }
+  async function install(){ try{ log('установка мода…'); await api.installMod(gamePath||undefined); setModState(true); log('мод установлен ✓'); await api.applyCourse(gamePath); }catch(e){ log('ошибка установки: '+e.message); showSetup('Не удалось установить мод: '+e.message, 'err') } }
+  async function uninstall(){ try{ log('удаление мода…'); await api.uninstallMod(gamePath||undefined); setModState(false); log('мод удалён') }catch(e){ log('ошибка удаления: '+e.message) } }
 
   // Подключение эфира: ник → комната → агент (как «Подключить стрим» в дашборде)
   async function connectStream(){
     const nick = ($('streamUser').value || '').trim().replace('@','').toLowerCase()
-    if(!nick){ showState('Укажите ник TikTok (шаг 5).','warn'); log('укажи ник TikTok'); return }
+    if(!nick){ log('укажи ник TikTok'); return }
     log('подключаем эфир @'+nick+'…')
-    const el=$('bConnect'); if(el){el.disabled=true; el.textContent='⟳ Подключение…'}
+    $('bConnect').disabled = true
     try{
       const r = await api.connectStream(nick, gamePath||undefined)
-      if(r && r.ok){ log('эфир подключён: комната @'+r.room+' ✓'); showState('Эфир подключён: @'+r.room,'') }
-      else { const m = agentErrText(r); log('эфир: '+m); showState(m,'warn') }
-    }catch(e){ const m=humanErr(e); log('ошибка подключения: '+m); showState(m,'err') }
-    finally { if(el){el.textContent='🔴 Подключить эфир'} refresh() }
+      if(r && r.ok){ log('эфир подключён: комната @'+r.room+' ✓') }
+      else if(r && r.reason==='no_username') log('укажи ник TikTok')
+      else if(r && r.reason==='gta-missing') log('GTA не найдена — выбери папку игры')
+      else if(r && r.reason==='mod-missing') log('мод не установлен — нажми «Установить мод»')
+      else if(r && r.reason==='subscription') log('нужна подписка PRO')
+      else if(r && r.reason==='auth') log('нужно войти в аккаунт')
+      else log('не удалось подключить эфир'+(r&&r.error?(' — '+r.error):''))
+    }catch(e){ log('ошибка подключения: '+e.message) }
+    finally { $('bConnect').disabled = false; refresh() }
   }
-  async function stopAll(){ try{ await api.stopAgent(); log('эфир остановлен'); showState('Агент/эфир остановлены.','') }catch(e){ log('stop: '+humanErr(e)) } await refresh() }
-  const ctrl=(action)=>api.command(action,1).then(()=>log('команда: '+action)).catch(e=>log('ошибка: '+humanErr(e)))
-  async function testAction(){ try{ const a=$('testAction').value, n=Number($('testCount').value)||1; await api.command(a,n); log('тест: '+actionLabel(a)+' ×'+n) }catch(e){ log('тест: ошибка — '+humanErr(e)) } }
+  async function stopAll(){ try{ await api.stopAgent(); log('эфир остановлен') }catch(e){ log('stop: '+e.message) } }
+  const ctrl=(action)=>api.command(action,1).then(()=>log('команда: '+action)).catch(e=>log('ошибка: '+e.message))
+  async function testAction(){ try{ const a=$('testAction').value, n=Number($('testCount').value)||1; await api.command(a,n); log('тест: '+actionLabel(a)+' ×'+n) }catch(e){ log('тест: ошибка — '+e.message) } }
 
   // ─── Тест зрителя: имитация событий TikTok (без эфира) ───
   function fillTestGifts(){
@@ -626,7 +544,7 @@
   async function sendTest(evt){
     if(!api) return
     try{ const r = await api.testEvent(evt); log('🧪 тест '+evt.type+': '+(r&&r.ok?'отправлено в правила':'?')) }
-    catch(e){ log('🧪 тест ошибка — '+humanErr(e)); showState(humanErr(e),'warn') }
+    catch(e){ log('🧪 тест ошибка — '+e.message) }
   }
   function sendTestGift(){
     const sel = $('testGift'); const id = sel ? sel.value : ''
@@ -643,45 +561,12 @@
   }
 
   async function saveSettings(){ const res = await api.settingsSet(getSettingsPayload()); await loadSettings(); log('настройки сохранены ✓'+(res.applied?(' · ini: '+res.applied):'')) }
-  async function applyCourse(){ const res = await api.applyCourse(gamePath||undefined); if(res.ok) log('курс применён к моду: '+res.applied); else log('курс не применён (мод не установлен?)','warn'), showState('Курс не применён: мод не установлен или GTA не найдена.','warn') }
+  async function applyCourse(){ const res = await api.applyCourse(gamePath||undefined); if(res.ok) log('курс применён к моду: '+res.applied); else log('курс не применён (мод не установлен?)') }
   async function resetSettings(){ await api.settingsReset(); await loadSettings(); log('настройки сброшены к дефолту') }
-  function depsHelp(){ showState('ScriptHookV и ScriptHookVDotNet скачайте с официальных источников: dev-c.com (ScriptHookV) и github.com/scripthookvdotnet (ScriptHookVDotNet). Скопируйте .asi/.dll и папку scripts в корень GTA V. Перезапустите GTA.', '') }
-  // Запуск GTA V Legacy через существующий IPC 'launch-game' → verifyAndLaunchGame().
-  async function launchGta(){
-    if(!gamePath){ showState('Сначала выберите папку GTA V Legacy (шаг 1).','warn'); return }
-    if(!api || typeof api.launchGame !== 'function'){
-      // Диагностика вместо raw "is not a function"
-      log('⚠️ api.launchGame недоступен (preload не пробросил метод)')
-      showState('Запуск GTA недоступен: метод launchGame не подключён в приложении. Обновите приложение.','err')
-      return
-    }
-    const el = $('bLaunchGta'); const prev = el ? el.textContent : ''
-    if(el){ el.disabled = true; el.textContent = '⟳ Запускаем GTA…' }
-    log('запускаем GTA V Legacy…')
-    showState('Запускаем GTA V Legacy…', '')
-    try{
-      const r = await api.launchGame('gta-koth', roomId || '')
-      // main возвращает undefined при успешном старте (verifyAndLaunchGame сам отдаёт события).
-      if(r && r.ok === false){
-        log('запуск GTA: '+(r.error||r.reason||'неизвестно'))
-        showState('Не удалось запустить GTA V Legacy: '+(r.error||r.reason||'неизвестная ошибка'),'err')
-      } else {
-        log('GTA V Legacy запущена ✓')
-        showState('GTA V запущена ✓ — ожидаем загрузку мода… Откройте Story Mode (не Online).','')
-      }
-    }catch(e){
-      const m = humanErr(e)
-      log('запуск GTA: '+m)
-      showState('Не удалось запустить GTA V Legacy: '+m,'err')
-    }finally{
-      if(el){ el.disabled = false; el.textContent = prev || '▶ Запустить GTA V Legacy' }
-      await refresh()
-    }
-  }
 
   // События мода
   if(api){
-    api.onAgentStatus(d=>{ log('агент: '+(d.message||d.kind)); refresh() })
+    api.onAgentStatus(d=>log('агент: '+(d.message||d.kind)))
     api.onStatus(d=>log('мод: '+(d.message||d.kind)))
     api.onCommand(d=>log('→ '+d.action+' ×'+d.count+' от '+d.name))
     api.onAck(d=>log('✓ '+d.action+' — '+(d.outcome||'ok')))
@@ -692,22 +577,14 @@
     try{
       const st = await api.state()
       const a = st.agent || {}
-      // Живые флаги для гейтинга кнопок
-      window.__agentRunning = !!st.agentRunning
-      window.__streamConnected = !!st.streamConnected || !!a.streamLive
-      if(st.deps) window.__lastDeps = st.deps
-      // GTA/путь в state-блоке
-      if(st.gtaFound){ dot($('dotGta'),'ok'); $('vGtaFound').textContent='✅ Найдена' }
-      dot($('dotAgent'), window.__agentRunning?'ok':'err')
-      $('vAgent').textContent = window.__agentRunning ? '🟢 запущен' : '🔴 остановлен'
-      dot($('dotAgent4'), window.__agentRunning?'ok':'err')
-      $('vAgent4').textContent = window.__agentRunning ? '🟢 Работает' : '🔴 Остановлен'
-      $('vAgentPid').textContent = window.__agentRunning ? (st.agentPid || st.agent?.pid || '—') : '—'
-      dot($('dotStream'), window.__streamConnected?'ok':'idle')
-      $('vStream').textContent = window.__streamConnected ? '🟢 подключён' : '⚪ не подключён'
-      dot($('dotStream5'), window.__streamConnected?'ok':'idle')
-      $('vStream5').textContent = window.__streamConnected ? '🟢 Эфир подключён' : '⚪ не подключён'
-      applyGate()
+      dot($('dotConn'), a.connected?'ok':'err'); $('vConn').textContent = a.connected?'подключено':'нет'
+      dot($('dotStream'), a.streamLive?'ok':'warn'); $('vStream').textContent = a.streamLive?'LIVE':'ожидание'
+      const m = a.mod||{}
+      $('sWin').textContent=m.wins??0; $('sFall').textContent=m.falls??0
+      $('sObj').textContent=m.objects??0; $('sQueue').textContent=m.queue??0
+      $('prog').style.width = ((m.progress??0)*100)+'%'
+      const phase = m.phase || '—'
+      dot($('dotPhase'), phase==='running'?'ok':phase==='error'?'err':'idle'); $('vPhase').textContent = phase
     }catch(e){}
   }
 
@@ -716,16 +593,12 @@
   $('bPick').onclick = pick
   $('bInstall').onclick = install
   $('bUninstall').onclick = uninstall
-  $('bReinstall').onclick = reinstall
-  $('bDepsHelp').onclick = depsHelp
-  $('bAgentStart').onclick = startAgentManual
-  $('bAgentStop').onclick = stopAgentManual
-  $('bLaunchGta').onclick = launchGta
   $('bConnect').onclick = connectStream
   $('bStopAll').onclick = stopAll
-  $('bBack').onclick = () => { try { api.back() } catch(e) { log('назад: '+humanErr(e)) } }
+  $('bBack').onclick = () => { try { api.back() } catch(e) { log('назад: '+e.message) } }
   $('cStart').onclick = ()=>ctrl('start'); $('cStop').onclick = ()=>ctrl('stop')
   $('cClear').onclick = ()=>ctrl('clear'); $('cReset').onclick = ()=>ctrl('reset')
+  $('bTest').onclick = testAction
   $('tGiftSend').onclick = sendTestGift
   $('tGift').onclick = sendTestGift
   $('tLike').onclick = sendTestLike
@@ -746,7 +619,7 @@
   })
 
   ;(async()=>{
-    // beta.15: ЕДИНЫЙ визард — roomId НЕ скрывает установку/диагностику.
+    if(roomId){ $('setup').classList.add('hidden'); $('main').classList.remove('hidden') }
     // Ник: из query (roomId) или сохранённый в приложении
     try{ if(roomId) $('streamUser').value = roomId; else { const u = await api.getUsername(); if(u&&u.username) $('streamUser').value = u.username } }catch(e){}
     await loadSettings()
