@@ -1,6 +1,6 @@
 {
   "name": "MazLiveKOTH",
-  "version": "2.0.0-beta.18",
+  "version": "2.0.0-beta.21",
   "protocol": 2,
   "platform": "GTA V Legacy / Windows / Story Mode",
   "runtimeTested": false,
@@ -56,5 +56,5 @@
       "sha256": "306b2f82481e79858fcec6a520048fa34ff553101bf98a9fefb847866b7d8db7"
     }
   ],
-  "note": "MazLiveKOTH пересобран под ScriptHookVDotNet3 v3.6.0 (ранее ошибочно 3.7.0 nightly)"
+  "note": "MazLiveKOTH \u043f\u0435\u0440\u0435\u0441\u043e\u0431\u0440\u0430\u043d \u043f\u043e\u0434 ScriptHookVDotNet3 v3.6.0 (\u0440\u0430\u043d\u0435\u0435 \u043e\u0448\u0438\u0431\u043e\u0447\u043d\u043e 3.7.0 nightly)"
 }

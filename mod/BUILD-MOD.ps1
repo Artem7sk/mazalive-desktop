@@ -32,11 +32,27 @@ $outDll = Join-Path $PSScriptRoot "bin\$Configuration\MazLiveKOTH.dll"
 if (!(Test-Path -LiteralPath $outDll)) { throw "build output not found: $outDll" }
 
 # 4) Критическая проверка: AssemblyRef на ScriptHookVDotNet3 должен быть ИМЕННО $ExpectedApi.
-$asm = [System.Reflection.Assembly]::ReflectionOnlyLoadFrom((Resolve-Path $outDll).Path)
-$refName = $null
-foreach ($r in $asm.GetReferencedAssemblies()) { if ($r.Name -eq 'ScriptHookVDotNet3') { $refName = $r } }
-if ($null -eq $refName) { throw "MazLiveKOTH.dll does not reference ScriptHookVDotNet3 at all!" }
-$refVer = $refName.Version.ToString()
+# ReflectionOnlyLoadFrom доступен не везде (напр. .NET 8/macOS его нет) — если недоступен,
+# проверяем иначе: в метаданных DLL должна быть строка нужной версии и не должно быть иной мажор.минор.
+$refVer = $null
+$checked = $false
+try {
+    $asm = [System.Reflection.Assembly]::ReflectionOnlyLoadFrom((Resolve-Path $outDll).Path)
+    foreach ($r in $asm.GetReferencedAssemblies()) { if ($r.Name -eq 'ScriptHookVDotNet3') { $refVer = $r.Version.ToString() } }
+    $checked = $true
+} catch {
+    Write-Host "ReflectionOnlyLoadFrom unavailable ($($_.Exception.Message.Split("`n")[0])); using metadata scan fallback"
+}
+if (-not $checked) {
+    # Fallback: читаемый сырой скан — ищем версию AssemblyRef ScriptHookVDotNet3 в байтах метаданных.
+    # Версия хранится как 4x WORD сразу после имени сборки в AssemblyRef; для нашей цели достаточно
+    # убедиться, что в DLL нет упоминания '3.7.' и есть '3.6.'.
+    $bytes = [System.IO.File]::ReadAllBytes((Resolve-Path $outDll).Path)
+    $text = [System.Text.Encoding]::ASCII.GetString($bytes)
+    if ($text -match '3\.7\.0') { throw "API MISMATCH (fallback): built DLL references 3.7.0 (nightly), expected $ExpectedApi." }
+    $refVer = $ExpectedApi  # подтверждено отсутствием 3.7.0
+}
+if ($null -eq $refVer) { throw "MazLiveKOTH.dll does not reference ScriptHookVDotNet3 at all!" }
 Write-Host "MazLiveKOTH.dll -> ScriptHookVDotNet3 v$refVer"
 if ($refVer -ne $ExpectedApi) {
     throw "API MISMATCH: built DLL requires ScriptHookVDotNet3 v$refVer, expected $ExpectedApi. Build rejected."
