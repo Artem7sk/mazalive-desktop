@@ -42,11 +42,15 @@ test('EULA EN: ключевые пункты', () => {
   assert.ok(t.includes('LIMITATION OF LIABILITY'), 'EULA EN: нет раздела об ответственности');
 });
 
-test('EULA: плейсхолдеры вместо выдуманных реквизитов', () => {
+test('EULA: автор MAZA PRODUCTION, без выдуманных реквизитов', () => {
   const ru = read(path.join(LEGAL, 'LICENSE_RU.txt'));
   const en = read(path.join(LEGAL, 'LICENSE_EN.txt'));
-  assert.ok(ru.includes('[указать при необходимости]'), 'RU: нет плейсхолдера');
-  assert.ok(en.includes('[to be provided]'), 'EN: нет плейсхолдера');
+  // Автор проекта заявлен явно, как бренд без юр. реквизитов.
+  assert.ok(ru.includes('MAZA PRODUCTION'), 'RU: нет автора MAZA PRODUCTION');
+  assert.ok(en.includes('MAZA PRODUCTION'), 'EN: нет автора MAZA PRODUCTION');
+  // Не должно быть выдуманных юр. реквизитов (ИНН/адрес/рег. номер).
+  assert.ok(!/ИНН|ОГРН|регистрационный номер\s*[:№]/i.test(ru), 'RU: выдуманные юр. реквизиты');
+  assert.ok(!/registration number\s*[:#]/i.test(en), 'EN: выдуманные юр. реквизиты');
 });
 
 test('Privacy: описывает передачу данных на серверы (не только локально)', () => {

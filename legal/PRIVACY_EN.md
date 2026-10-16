@@ -1,11 +1,12 @@
 # MAZLIVE Desktop Privacy Policy
 
 **Software:** MAZLIVE Desktop ("MAZLIVE Desktop 2.0")
-**Rights holder:** MAZA PRODUCTION
+**Project:** MAZLIVE
+**Author (controller):** MAZA PRODUCTION
 **Document version:** draft-1 (2.0.0-beta.24)
 
 > **Status:** PREPARED FOR LEGAL REVIEW; not reviewed by a lawyer.
-> Unknown details are marked as `[to be provided]` and are subject to confirmation.
+> Unknown technical details are marked as `[to be provided]`.
 
 ---
 
@@ -20,8 +21,7 @@
      only** — authentication data, stream events and service requests are sent to
      the service's servers.
 
-1.3. Data controller: MAZA PRODUCTION. Details: `[to be provided]`.
-     Contact for data matters: `[to be provided]`.
+1.3. Data controller: the author of the MAZLIVE project — MAZA PRODUCTION.
 
 ---
 
@@ -111,8 +111,7 @@ The User may:
   cleanup on logout);
 - uninstall the app and delete associated local files.
 
-To exercise your rights, contact: `[to be provided]`.
-Response procedure and timelines: `[to be provided]`.
+To exercise your rights, contact the author of the MAZLIVE project (MAZA PRODUCTION).
 
 ---
 
@@ -126,18 +125,17 @@ Response procedure and timelines: `[to be provided]`.
 
 ---
 
-## 8. Questions for the Rights Holder (unknown data)
+## 8. Items to Confirm (unknown data)
 
-The following must be confirmed before publishing a final version:
-1. Legal details of the controller (MAZA PRODUCTION): full name, address, registration number.
-2. Contact e-mail/address for data requests.
-3. Exact retention periods on the MAZLIVE server side.
-4. List of sub-processors (hosting, TikTok integration, analytics) and their roles.
-5. Applicable law and supervisory authority.
-6. Presence/absence of cross-border data transfers.
-7. Legal basis for processing (consent, contract, legitimate interest).
+The following technical/legal details are to be clarified before publishing a final
+version. The author of the project (MAZA PRODUCTION) did not provide them; they are
+intentionally not invented:
+1. Exact retention periods on the MAZLIVE server side.
+2. List of sub-processors (hosting, TikTok integration, analytics) and their roles.
+3. Applicable law and supervisory authority.
+4. Presence/absence of cross-border data transfers.
+5. Legal basis for processing (consent, contract, legitimate interest).
 
 ---
 
 > © MAZA PRODUCTION. Prepared for legal review; not legal advice.
-> Details and retention periods are subject to confirmation by an authorized person.

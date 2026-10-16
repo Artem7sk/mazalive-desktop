@@ -1,23 +1,17 @@
 END USER LICENSE AGREEMENT (EULA)
 Software: MAZLIVE Desktop ("MAZLIVE Desktop 2.0")
-Rights holder: MAZA PRODUCTION
+Project: MAZLIVE
+Author: MAZA PRODUCTION
 
 Document version: draft-1 (2.0.0-beta.24)
 Status: PREPARED FOR LEGAL REVIEW. This document has not been reviewed by a lawyer.
 It is not a final legal document until confirmed by a qualified professional.
 
-────────────────────────────────────────────────────────────────────────
-IMPORTANT: THIS DOCUMENT CONTAINS PLACEHOLDERS
-Details of the rights holder (full name, legal address, registration number,
-contact e-mail) are marked as [to be provided]. They are intentionally left
-blank and must be confirmed before publishing a final version.
-────────────────────────────────────────────────────────────────────────
-
 1. DEFINITIONS AND SUBJECT MATTER
 1.1. "Software" means the MAZLIVE Desktop application, including its components,
      the bundled game mod "MazLiveKOTH" (running locally inside GTA V) and
      related materials.
-1.2. "Rights holder" means MAZA PRODUCTION (a brand). Details: [to be provided].
+1.2. "Rights holder" means the author of the MAZLIVE project: MAZA PRODUCTION.
 1.3. "User" means a natural person who installs and/or uses the Software.
 1.4. "MAZLIVE Service" means the website https://mazlive.com and related server
      services accessed by the Software (authentication, game catalog, stream
@@ -36,8 +30,7 @@ blank and must be confirmed before publishing a final version.
 2.2. The license does not transfer any ownership rights in the Software or
      Author Content to the User. All rights not expressly granted herein are
      reserved by the Rights holder.
-2.3. The license is valid in the territory of [to be provided] and until
-     termination under Section 9.
+2.3. The license is valid until termination under Section 9.
 
 3. STREAMERS' RIGHTS TO COMMERCIAL BROADCASTS
 3.1. The Rights holder permits the User to use the Software in live broadcasts,
@@ -110,8 +103,7 @@ blank and must be confirmed before publishing a final version.
 9.3. Upon termination, the User must stop using and uninstall the Software.
      Sections that by their nature survive (including limitations and liability)
      remain in force.
-9.4. Support is provided at the discretion of the Rights holder; support channels:
-     [to be provided].
+9.4. Support is provided at the discretion of the author (MAZA PRODUCTION).
 
 10. THIRD-PARTY COMPONENTS
 10.1. The Software uses third-party components distributed under their own
@@ -127,16 +119,15 @@ blank and must be confirmed before publishing a final version.
       to review it before using the Software.
 
 12. MISCELLANEOUS
-12.1. Governing law and jurisdiction: [to be provided] — subject to confirmation,
-      taking into account mandatory consumer rights.
+12.1. Governing law and jurisdiction are determined taking into account mandatory
+      consumer rights and are subject to confirmation by the author of the project.
 12.2. The Rights holder may amend this Agreement by publishing a new version.
       Continued use constitutes acceptance of the changes.
 12.3. If any provision is held invalid, the remaining provisions remain in force.
 
-Rights holder contact (for legal matters): [to be provided]
+MAZLIVE is a project by MAZA PRODUCTION.
 
 ────────────────────────────────────────────────────────────────────────
 © MAZA PRODUCTION. All rights reserved.
 Prepared for legal review; not legal advice.
-Details and governing law are subject to confirmation by an authorized person/lawyer.
 ────────────────────────────────────────────────────────────────────────
