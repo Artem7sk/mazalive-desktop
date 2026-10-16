@@ -12,17 +12,44 @@ const REPO = path.join(ROOT, '..');
 const LEGAL = path.join(REPO, 'legal');
 const RENDERER = path.join(REPO, 'renderer');
 
-const read = (p) => fs.readFileSync(p, 'utf8');
+// Читаем с авто-определением BOM: правовые документы хранятся в UTF-16LE с BOM,
+// чтобы NSIS-экран лицензии и «Блокнот» Windows корректно показывали кириллицу
+// (иначе UTF-8 без BOM читается как ANSI → кракозябры в установщике).
+const read = (p) => {
+  const buf = fs.readFileSync(p);
+  if (buf.length >= 2 && buf[0] === 0xff && buf[1] === 0xfe) {
+    return buf.slice(2).toString('utf16le');
+  }
+  if (buf.length >= 2 && buf[0] === 0xfe && buf[1] === 0xff) {
+    // UTF-16BE — вручную переставить байты
+    const swapped = Buffer.from(buf.slice(2));
+    swapped.swap16();
+    return swapped.toString('utf16le');
+  }
+  return buf.toString('utf8');
+};
 
-test('legal: все 4 документа присутствуют и непусты (UTF-8)', () => {
+test('legal: все 4 документа присутствуют и непусты (UTF-16LE/BOM или UTF-8)', () => {
   const files = ['LICENSE_RU.txt', 'LICENSE_EN.txt', 'PRIVACY_RU.md', 'PRIVACY_EN.md'];
   for (const f of files) {
     const p = path.join(LEGAL, f);
     assert.ok(fs.existsSync(p), `нет файла ${f}`);
     const txt = read(p);
     assert.ok(txt.length > 500, `${f} слишком короткий`);
-    assert.ok(!txt.includes('\uFFFD'), `${f} содержит битые символы (не UTF-8?)`);
+    assert.ok(!txt.includes('\uFFFD'), `${f} содержит битые символы`);
   }
+});
+
+test('legal: LICENSE_RU.txt кодирован UTF-16LE с BOM (для NSIS-экрана лицензии)', () => {
+  // NSIS с unicode=true читает MUI_PAGE_LICENSE как UTF-16; UTF-8 без BOM → кракозябры.
+  const buf = fs.readFileSync(path.join(LEGAL, 'LICENSE_RU.txt'));
+  assert.ok(buf.length >= 2 && buf[0] === 0xff && buf[1] === 0xfe,
+    'LICENSE_RU.txt должен начинаться с BOM UTF-16LE (0xFF 0xFE)');
+  const txt = read(path.join(LEGAL, 'LICENSE_RU.txt'));
+  assert.ok(txt.includes('ЛИЦЕНЗИОННОЕ СОГЛАШЕНИЕ'),
+    'LICENSE_RU.txt: кириллица не декодируется корректно');
+  // Проверка, что это НЕ UTF-8-байты (иначе снова будет mojibake в установщике).
+  assert.ok(!/Ð›Ð˜Ð¦Ð•Ð/.test(txt), 'LICENSE_RU.txt: обнаружен mojibake UTF-8-как-ANSI');
 });
 
 test('EULA RU: ключевые пункты и статус юр. проверки', () => {

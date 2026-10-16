@@ -44,6 +44,14 @@ jobs:
             if ($len -lt 500) { Write-Error "$f too small ($len bytes)"; exit 1 }
             Write-Host "OK $f ($len bytes)"
           }
+          # LICENSE_RU.txt должен быть UTF-16LE с BOM (0xFF 0xFE), иначе NSIS-экран
+          # лицензии покажет кириллицу как кракозябры (UTF-8 читается как ANSI).
+          $bytes = [System.IO.File]::ReadAllBytes("legal\LICENSE_RU.txt")
+          if ($bytes.Length -lt 2 -or $bytes[0] -ne 0xFF -or $bytes[1] -ne 0xFE) {
+            Write-Error "legal\LICENSE_RU.txt must be UTF-16LE with BOM (FF FE) for the NSIS license screen"
+            exit 1
+          }
+          Write-Host "OK LICENSE_RU.txt is UTF-16LE with BOM"
       - name: Build Windows EXE (NSIS, license screen)
         run: npx tsc && node prepare-mod-dist.mjs && npx electron-builder --win
         env:
@@ -109,6 +117,9 @@ jobs:
             test -f "$f" || { echo "missing $f"; exit 1; }
             echo "OK $f ($(wc -c < "$f") bytes)"
           done
+          # LICENSE_RU.txt: BOM UTF-16LE (FF FE) — иначе NSIS-экран лицензии покажет кракозябры.
+          head -c 2 legal/LICENSE_RU.txt | od -An -tx1 | grep -q "ff fe" || { echo "LICENSE_RU.txt must be UTF-16LE with BOM"; exit 1; }
+          echo "OK LICENSE_RU.txt is UTF-16LE with BOM"
       - run: npm test
       - run: npx tsc && node prepare-mod-dist.mjs && npx electron-builder --mac
         env:
