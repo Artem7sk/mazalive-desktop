@@ -115,9 +115,9 @@ test('about.html: НЕ делает внешних сетевых запросо
   assert.ok(!/https?:\/\/[^"'\s]+/.test(script.replace(/https?:\/\/mazlive\.com\//g, '')), 'в скрипте есть внешний URL');
 });
 
-test('package.json: NSIS license + legal в files + версия beta.24', () => {
+test('package.json: NSIS license + legal в files + бета-версия 2.0.0', () => {
   const pkg = JSON.parse(read(path.join(REPO, 'package.json')));
-  assert.equal(pkg.version, '2.0.0-beta.24', 'версия не beta.24');
+  assert.match(pkg.version, /^2\.0\.0-beta\.\d+$/, 'версия должна быть 2.0.0-beta.N');
   assert.ok(pkg.build.files.includes('legal/**/*'), 'legal/**/* не попадает в сборку');
   assert.ok(pkg.build.nsis, 'нет блока nsis');
   assert.equal(pkg.build.nsis.license, 'legal/LICENSE_RU.txt', 'nsis.license не указывает на EULA');

@@ -118,7 +118,9 @@ jobs:
             echo "OK $f ($(wc -c < "$f") bytes)"
           done
           # LICENSE_RU.txt: BOM UTF-16LE (FF FE) — иначе NSIS-экран лицензии покажет кракозябры.
-          head -c 2 legal/LICENSE_RU.txt | od -An -tx1 | grep -q "ff fe" || { echo "LICENSE_RU.txt must be UTF-16LE with BOM"; exit 1; }
+          # Сравниваем первые 2 байта побайтово (устойчиво к формату od на macOS/Linux).
+          bom="$(head -c 2 legal/LICENSE_RU.txt | xxd -p)"
+          [ "$bom" = "fffe" ] || { echo "LICENSE_RU.txt must be UTF-16LE with BOM (got $bom)"; exit 1; }
           echo "OK LICENSE_RU.txt is UTF-16LE with BOM"
       - run: npm test
       - run: npx tsc && node prepare-mod-dist.mjs && npx electron-builder --mac
