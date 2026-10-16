@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;"/>
+<title>Mazlive — О программе</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --purple:#a855f7;--blue:#3b82f6;--cyan:#06b6d4;--gold:#ffd700;
+    --bg:#0d1117;--surface:#161b22;--surface2:#1c2330;--border:#30363d;
+    --text:#e6edf3;--muted:#8b949e;--ok:#22c55e;--warn:#f59e0b;
+  }
+  body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,'Segoe UI',sans-serif;padding:18px;min-height:100vh;font-size:13px}
+  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(168,85,247,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(168,85,247,.03) 1px,transparent 1px);background-size:44px 44px;pointer-events:none}
+  .wrap{max-width:640px;margin:0 auto;position:relative}
+  .head{display:flex;align-items:center;gap:14px;margin-bottom:16px}
+  .logo{width:56px;height:56px;border-radius:14px;background:linear-gradient(135deg,var(--purple),var(--blue));display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:800;box-shadow:0 6px 20px rgba(168,85,247,.35)}
+  h1{font-size:20px;letter-spacing:.5px;background:linear-gradient(90deg,var(--gold),var(--purple));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{color:var(--muted);font-size:11px;margin-top:3px}
+  .langbar{display:flex;gap:6px;margin-left:auto;align-self:flex-start}
+  .langbar button{min-width:38px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px}
+  .card h2{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--purple);margin-bottom:10px}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:7px}
+  .row:last-child{margin-bottom:0}
+  .label{color:var(--muted);font-size:12px}
+  .val{font-size:12px;font-weight:600;text-align:right;word-break:break-all}
+  .val.mono{font-family:ui-monospace,monospace}
+  button{background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:9px;padding:9px 12px;font-size:12px;font-weight:600;cursor:pointer;transition:.15s;font-family:inherit}
+  button:hover{border-color:var(--purple);background:#21293a}
+  button.primary{background:linear-gradient(135deg,var(--purple),var(--blue));border:none;color:#fff}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  button.active{border-color:var(--purple);background:#21293a}
+  .btnrow{display:flex;flex-wrap:wrap;gap:8px}
+  .btnrow button{flex:1 1 auto}
+  ul{margin:0;padding-left:18px;color:var(--muted);font-size:12px;line-height:1.7}
+  ul b{color:var(--text)}
+  .muted{color:var(--muted);font-size:11px;line-height:1.6}
+  .legal-note{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.4);border-radius:10px;padding:10px;font-size:11px;line-height:1.6;color:#fcd34d;margin-bottom:12px}
+  .status{font-size:11px;margin-top:8px;min-height:16px;color:var(--muted)}
+  .status.ok{color:#4ade80}.status.err{color:#f87171}
+  a{color:var(--cyan);text-decoration:none}
+  .footer{text-align:center;color:var(--muted);font-size:10px;margin-top:6px;line-height:1.6}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <div class="logo">M</div>
+    <div>
+      <h1>MAZLIVE Desktop</h1>
+      <div class="sub" id="tagline">Стримерский лаунчер игр · MAZA PRODUCTION</div>
+    </div>
+    <div class="langbar">
+      <button id="langRu">RU</button>
+      <button id="langEn">EN</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 id="hInfo">Информация</h2>
+    <div class="row"><span class="label" id="lVersion">Версия</span><span class="val mono" id="vVersion">—</span></div>
+    <div class="row"><span class="label" id="lApp">Приложение</span><span class="val">MAZLIVE Desktop 2.0</span></div>
+    <div class="row"><span class="label" id="lOwner">Правообладатель</span><span class="val">MAZA PRODUCTION</span></div>
+    <div class="row"><span class="label" id="lSite">Сайт</span><button class="val" id="bSite" style="background:none;border:none;color:var(--cyan);font-weight:600;cursor:pointer;padding:0">https://mazlive.com/</button></div>
+  </div>
+
+  <div class="card">
+    <h2 id="hLegal">Правовые документы</h2>
+    <div class="muted" id="legalIntro" style="margin-bottom:10px">Документы открываются локально, без обращения к сети.</div>
+    <div class="btnrow">
+      <button id="bLicRu">Лицензия (RU)</button>
+      <button id="bLicEn">License (EN)</button>
+    </div>
+    <div class="btnrow" style="margin-top:8px">
+      <button id="bPrivRu">Конфиденциальность (RU)</button>
+      <button id="bPrivEn">Privacy (EN)</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2 id="hComponents">Компоненты третьих лиц</h2>
+    <ul id="components">
+      <li><b>Electron</b> — <span data-pkg="electron">—</span></li>
+      <li><b>electron-updater</b> — <span data-pkg="electron-updater">—</span></li>
+      <li><b>axios</b> — <span data-pkg="axios">—</span></li>
+      <li><b>socket.io-client</b> — <span data-pkg="socket.io-client">—</span></li>
+      <li><b>electron-store</b> — <span data-pkg="electron-store">—</span></li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2 id="hUpdates">Обновления</h2>
+    <div class="btnrow">
+      <button class="primary" id="bCheck">Проверить обновления</button>
+    </div>
+    <div class="status" id="updStatus"></div>
+  </div>
+
+  <div class="legal-note" id="legalNote">
+    Правовые документы подготовлены к юридической проверке и не проверены юристом.
+    Реквизиты правообладателя не заполнены.
+  </div>
+
+  <div class="footer" id="footer">© MAZA PRODUCTION. Все права защищены.</div>
+</div>
+
+<script>
+  // ── Локальный словарь RU/EN (без сети) ──
+  const DICT = {
+    ru: {
+      tagline: 'Стримерский лаунчер игр · MAZA PRODUCTION',
+      hInfo: 'Информация',
+      lVersion: 'Версия', lApp: 'Приложение', lOwner: 'Правообладатель', lSite: 'Сайт',
+      hLegal: 'Правовые документы',
+      legalIntro: 'Документы открываются локально, без обращения к сети.',
+      bLicRu: 'Лицензия (RU)', bLicEn: 'License (EN)',
+      bPrivRu: 'Конфиденциальность (RU)', bPrivEn: 'Privacy (EN)',
+      hComponents: 'Компоненты третьих лиц',
+      hUpdates: 'Обновления', bCheck: 'Проверить обновления',
+      legalNote: 'Правовые документы подготовлены к юридической проверке и не проверены юристом. Реквизиты правообладателя не заполнены.',
+      footer: '© MAZA PRODUCTION. Все права защищены.',
+      checking: 'Проверка…', uptodate: 'У вас последняя версия.', error: 'Не удалось проверить обновления.'
+    },
+    en: {
+      tagline: 'Streamer game launcher · MAZA PRODUCTION',
+      hInfo: 'Information',
+      lVersion: 'Version', lApp: 'Application', lOwner: 'Rights holder', lSite: 'Website',
+      hLegal: 'Legal documents',
+      legalIntro: 'Documents open locally, without any network access.',
+      bLicRu: 'Лицензия (RU)', bLicEn: 'License (EN)',
+      bPrivRu: 'Конфиденциальность (RU)', bPrivEn: 'Privacy (EN)',
+      hComponents: 'Third-party components',
+      hUpdates: 'Updates', bCheck: 'Check for updates',
+      legalNote: 'Legal documents are prepared for legal review and have not been reviewed by a lawyer. Rights holder details are not filled in.',
+      footer: '© MAZA PRODUCTION. All rights reserved.',
+      checking: 'Checking…', uptodate: 'You have the latest version.', error: 'Failed to check for updates.'
+    }
+  }
+  let LANG = 'ru'
+
+  function applyLang(lang) {
+    LANG = DICT[lang] ? lang : 'ru'
+    const d = DICT[LANG]
+    for (const k of Object.keys(d)) {
+      const el = document.getElementById(k)
+      if (el) el.textContent = d[k]
+    }
+    ['langRu','langEn'].forEach((id) => {
+      const b = document.getElementById(id)
+      if (b) b.classList.toggle('active', (id === 'langRu') === (LANG === 'ru'))
+    })
+    document.documentElement.lang = LANG
+  }
+
+  // ── API из preload (узкий, безопасный) ──
+  const api = (window.mazalive && window.mazalive.about) || null
+  const gta = (window.mazalive && window.mazalive.gta) || null
+  const $ = (id) => document.getElementById(id)
+
+  async function boot() {
+    // Версия + зависимости
+    try {
+      if (api) {
+        const info = await api.info()
+        if (info) {
+          $('vVersion').textContent = info.version || '—'
+          if (info.dependencies) {
+            document.querySelectorAll('[data-pkg]').forEach((el) => {
+              const name = el.getAttribute('data-pkg')
+              el.textContent = info.dependencies[name] || '—'
+            })
+          }
+        }
+      }
+    } catch (e) { /* версия недоступна — не критично */ }
+
+    // Язык по умолчанию — из системной локали
+    const nav = (navigator.language || 'ru').toLowerCase()
+    applyLang(nav.startsWith('ru') ? 'ru' : 'en')
+
+    // Кнопки
+    $('langRu').onclick = () => applyLang('ru')
+    $('langEn').onclick = () => applyLang('en')
+    $('bSite').onclick = () => { try { api && api.openExternal('https://mazlive.com/') } catch (e) {} }
+    $('bLicRu').onclick = () => { try { api && api.openDoc('license', 'ru') } catch (e) {} }
+    $('bLicEn').onclick = () => { try { api && api.openDoc('license', 'en') } catch (e) {} }
+    $('bPrivRu').onclick = () => { try { api && api.openDoc('privacy', 'ru') } catch (e) {} }
+    $('bPrivEn').onclick = () => { try { api && api.openDoc('privacy', 'en') } catch (e) {} }
+
+    // Проверка обновлений — переиспользуем существующий IPC через gta? нет.
+    // Используем отдельный узкий мост about.checkUpdates, который проксирует 'check-updates'.
+    $('bCheck').onclick = async () => {
+      const st = $('updStatus')
+      st.className = 'status'
+      st.textContent = DICT[LANG].checking
+      try {
+        const r = api ? await api.checkUpdates() : null
+        st.textContent = DICT[LANG].uptodate + (r ? ' (' + r + ')' : '')
+        st.className = 'status ok'
+      } catch (e) {
+        st.textContent = DICT[LANG].error
+        st.className = 'status err'
+      }
+    }
+  }
+  boot()
+</script>
+</body>
+</html>

@@ -53,6 +53,7 @@ const DEV = process.env.NODE_ENV === 'development'
 let authWindow: BrowserWindow | null = null
 let mainWindow: BrowserWindow | null = null
 let gameWindow: BrowserWindow | null = null
+let aboutWindow: BrowserWindow | null = null
 
 // ─── GTA desktop-game runtime ───
 let gtaAgent: any | null = null
@@ -205,6 +206,59 @@ function createMainWindow() {
   mainWindow.on('closed', () => {
     mainWindow = null
   })
+}
+
+// =============================================================
+// Локальное окно «О программе» (beta.24)
+// Показывает версию, правообладателя, ссылку и правовые документы.
+// ВАЖНО: окно полностью локальное — НЕ грузит сайт и НЕ делает сетевых
+// запросов (кроме явной кнопки «Проверить обновления»).
+// =============================================================
+function aboutDocPath(kind: 'license' | 'privacy', lang: 'ru' | 'en'): string {
+  const base = path.join(__dirname, '..', 'legal')
+  if (kind === 'license') return path.join(base, lang === 'en' ? 'LICENSE_EN.txt' : 'LICENSE_RU.txt')
+  return path.join(base, lang === 'en' ? 'PRIVACY_EN.md' : 'PRIVACY_RU.md')
+}
+
+function createAboutWindow() {
+  if (aboutWindow && !aboutWindow.isDestroyed()) {
+    aboutWindow.focus()
+    return
+  }
+  aboutWindow = new BrowserWindow({
+    width: 720,
+    height: 780,
+    minWidth: 560,
+    minHeight: 520,
+    title: 'Mazlive — О программе',
+    icon: path.join(__dirname, '../assets/icon.png'),
+    backgroundColor: '#0d1117',
+    parent: mainWindow ?? undefined,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true,
+      preload: path.join(__dirname, 'about-preload.js'),
+    },
+  })
+  aboutWindow.loadFile(path.join(__dirname, '..', 'renderer', 'about.html'))
+  // Окно About не должно уходить на внешние ресурсы — только локальные файлы.
+  aboutWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  aboutWindow.webContents.on('will-navigate', (event, url) => {
+    if (!url.startsWith('file://')) {
+      event.preventDefault()
+      if (/^https?:\/\//.test(url)) shell.openExternal(url)
+    }
+  })
+  aboutWindow.on('closed', () => { aboutWindow = null })
+}
+
+/** Открыть правовой документ (лицензия/политика) в системном просмотрщике — ЛОКАЛЬНО, без сети. */
+async function openLegalDoc(kind: 'license' | 'privacy', lang: 'ru' | 'en') {
+  const p = aboutDocPath(kind, lang)
+  if (!fs.existsSync(p)) return { ok: false, error: 'Документ не найден: ' + path.basename(p) }
+  const err = await shell.openPath(p)
+  return err ? { ok: false, error: err } : { ok: true, path: p }
 }
 
 // =============================================================
@@ -1023,10 +1077,25 @@ app.on('open-url', (_event, url) => {
 // App lifecycle
 // =============================================================
 app.whenReady().then(() => {
-  // 🚫 ГЛОБАЛЬНО убираем меню приложения (Файл/Правка/Вид...).
-  // setMenu(null) на окне ненадёжен на Windows (Alt показывает меню), поэтому
-  // снимаем меню на уровне всего приложения — это работает во ВСЕХ окнах.
-  Menu.setApplicationMenu(null)
+  // ── Меню приложения (beta.24) ──
+  // Раньше меню полностью снималось (Menu.setApplicationMenu(null)). Теперь
+  // оставляем СКРЫТУЮ панель меню с единственным пунктом «О программе» и
+  // горячей клавишей, чтобы открыть локальное окно About. Видимая панель
+  // меню на окнах остаётся скрытой (setMenuBarVisibility(false)), поэтому UI
+  // кабинета/панели не меняется; пункт доступен по Alt и по горячей клавише.
+  const aboutMenu = Menu.buildFromTemplate([
+    {
+      label: 'MAZLIVE',
+      submenu: [
+        {
+          label: 'О программе / About',
+          accelerator: 'CmdOrCtrl+Shift+A',
+          click: () => createAboutWindow(),
+        },
+      ],
+    },
+  ])
+  Menu.setApplicationMenu(aboutMenu)
 
   // Проверяем, залогинен ли пользователь
   if (tokenStore.isLoggedIn()) {
@@ -1192,6 +1261,46 @@ function checkForUpdates(interactive = false) {
 ipcMain.handle('check-updates', () => {
   checkForUpdates(true)
   return APP_VERSION
+})
+
+// ─── «О программе» (beta.24) ───
+// Наружу отдаём только версию и версии компонентов третьих лиц (из package.json).
+// Никаких сетевых запросов и доступа к пользовательским данным здесь нет.
+ipcMain.handle('about-info', () => {
+  let deps: Record<string, string> = {}
+  try {
+    // package.json в упакованном виде лежит рядом с dist (app.asar root).
+    const pkgPath = path.join(__dirname, '..', 'package.json')
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'))
+    const pick = ['electron', 'electron-updater', 'axios', 'socket.io-client', 'electron-store']
+    for (const name of pick) {
+      const v =
+        (pkg.dependencies && pkg.dependencies[name]) ||
+        (pkg.devDependencies && pkg.devDependencies[name]) ||
+        '—'
+      deps[name] = String(v).replace(/^[\^~]/, '')
+    }
+  } catch (e) { /* нет package.json — вернём пусто */ }
+  return { version: APP_VERSION, dependencies: deps }
+})
+
+// Открыть локальный правовой документ (без сети).
+ipcMain.handle('about-open-doc', (_e, { kind, lang }: { kind: 'license' | 'privacy'; lang: 'ru' | 'en' }) => {
+  return openLegalDoc(kind === 'privacy' ? 'privacy' : 'license', lang === 'en' ? 'en' : 'ru')
+})
+
+// Открыть внешнюю ссылку ТОЛЬКО через системный браузер (без навигации в окне).
+ipcMain.handle('about-open-external', (_e, { url }: { url: string }) => {
+  const u = String(url || '')
+  if (!/^https?:\/\//.test(u)) return { ok: false, error: 'Недопустимая ссылка' }
+  shell.openExternal(u)
+  return { ok: true }
+})
+
+// Открыть окно «О программе» (используется нативным меню и IPC).
+ipcMain.handle('open-about', () => {
+  createAboutWindow()
+  return { ok: true }
 })
 
 // beta.15: Updater UI — скачать/установить по кнопке из renderer
