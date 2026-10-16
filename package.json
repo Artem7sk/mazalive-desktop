@@ -1,12 +1,12 @@
 {
   "name": "mazlive-desktop",
-  "version": "2.0.0-beta.23",
+  "version": "2.0.0-beta.25",
   "description": "Mazlive Desktop 2.0 Beta — Streamer Game Launcher (web-games + GTA «Царь горы»)",
   "main": "dist/main.js",
   "scripts": {
     "build": "tsc",
     "start": "electron .",
-    "test": "node --test test/bridge.test.mjs test/rules.test.mjs test/gta-agent.test.mjs",
+    "test": "node --test test/bridge.test.mjs test/rules.test.mjs test/gta-agent.test.mjs test/legal-about.test.mjs",
     "dist": "npm run build && node prepare-mod-dist.mjs && electron-builder",
     "build-win": "npm run build && node prepare-mod-dist.mjs && electron-builder --win",
     "build-mac": "npm run build && node prepare-mod-dist.mjs && electron-builder --mac"
@@ -33,7 +33,9 @@
       "dist/**/*",
       "renderer/**/*",
       "agent/**/*",
-      "assets/**/*"
+      "assets/**/*",
+      "legal/**/*",
+      "package.json"
     ],
     "extraResources": [
       {
@@ -47,6 +49,19 @@
     ],
     "win": {
       "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "unicode": true,
+      "license": "legal/LICENSE_RU.txt",
+      "multiLanguageInstaller": true,
+      "installerLanguages": [
+        "ru_RU",
+        "en_US"
+      ],
+      "artifactName": "${productName}-Setup-${version}.${ext}"
     },
     "mac": {
       "target": "zip"

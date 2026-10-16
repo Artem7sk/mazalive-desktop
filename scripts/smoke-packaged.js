@@ -36,7 +36,7 @@ async function checkAsar() {
     asar = src || (await import(require('url').pathToFileURL(asarMain).href));
   } catch (e) { fail('@electron/asar недоступен: ' + e.message); return; }
   const files = asar.listPackage(asarPath).map((f) => f.replace(/\\/g, '/'));
-  for (const need of ['/dist/main.js', '/agent/load-agent.js', '/agent/gta-agent.mjs', '/agent/rules.mjs', '/agent/bridge.mjs']) {
+  for (const need of ['/dist/main.js', '/agent/load-agent.js', '/agent/gta-agent.mjs', '/agent/rules.mjs', '/agent/bridge.mjs', '/dist/about-preload.js', '/renderer/about.html']) {
     if (files.includes(need)) ok('asar содержит ' + need);
     else fail('asar НЕ содержит ' + need);
   }
@@ -86,10 +86,43 @@ async function checkWindow() {
   });
 }
 
+// 4) Локальное окно «О программе» (beta.24) грузится из файла и не делает сетевых запросов.
+async function checkAboutWindow() {
+  const pages = [
+    path.join(__dirname, '..', 'renderer', 'about.html'),
+    path.join(__dirname, '..', 'dist', 'win-unpacked', 'resources', 'app', 'renderer', 'about.html'),
+  ];
+  const page = pages.find((p) => fs.existsSync(p)) || pages[0];
+  if (!fs.existsSync(page)) { fail('about.html не найден'); return; }
+  return new Promise((resolve) => {
+    const win = new BrowserWindow({
+      show: false, width: 720, height: 780,
+      webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true },
+    });
+    let sawExternal = false;
+    win.webContents.on('will-navigate', (e, url) => {
+      if (!String(url).startsWith('file://')) { sawExternal = true; e.preventDefault(); }
+    });
+    win.webContents.on('did-finish-load', async () => {
+      // Никаких сетевых запросов из окна About быть не должно.
+      const html = await win.webContents.executeJavaScript('document.documentElement.outerHTML').catch(() => '');
+      if (/fetch\s*\(|XMLHttpRequest|new\s+WebSocket/.test(html)) fail('about.html содержит сетевой вызов');
+      else ok('about.html: сетевых вызовов не найдено');
+      if (sawExternal) fail('about.html пытался уйти на внешний ресурс');
+      else ok('about.html: внешних навигаций нет');
+      win.close();
+      resolve();
+    });
+    win.loadFile(page);
+    setTimeout(() => { fail('about.html не загрузился за 10с'); resolve(); }, 10000);
+  });
+}
+
 app.whenReady().then(async () => {
   await checkAsar();
   await checkAgentLoad();
   await checkWindow();
+  await checkAboutWindow();
   console.log(failed ? '\n=== SMOKE RESULT: FAIL ===' : '\n=== SMOKE RESULT: PASS ===');
   app.exit(failed ? 1 : 0);
 }).catch((e) => { fail('whenReady: ' + e.message); app.exit(1); });

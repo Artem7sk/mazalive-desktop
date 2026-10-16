@@ -32,9 +32,27 @@ jobs:
         run: npm ci
       - name: Typecheck
         run: npx tsc --noEmit
-      - name: Unit tests (agent/rules/bridge)
+      - name: Unit tests (agent/rules/bridge/legal-about)
         run: npm test
-      - name: Build Windows EXE (NSIS)
+      - name: Verify legal documents present (beta.24)
+        shell: pwsh
+        run: |
+          $files = @("legal\LICENSE_RU.txt","legal\LICENSE_EN.txt","legal\PRIVACY_RU.md","legal\PRIVACY_EN.md")
+          foreach ($f in $files) {
+            if (-not (Test-Path $f)) { Write-Error "missing $f"; exit 1 }
+            $len = (Get-Item $f).Length
+            if ($len -lt 500) { Write-Error "$f too small ($len bytes)"; exit 1 }
+            Write-Host "OK $f ($len bytes)"
+          }
+          # LICENSE_RU.txt должен быть UTF-16LE с BOM (0xFF 0xFE), иначе NSIS-экран
+          # лицензии покажет кириллицу как кракозябры (UTF-8 читается как ANSI).
+          $bytes = [System.IO.File]::ReadAllBytes("legal\LICENSE_RU.txt")
+          if ($bytes.Length -lt 2 -or $bytes[0] -ne 0xFF -or $bytes[1] -ne 0xFE) {
+            Write-Error "legal\LICENSE_RU.txt must be UTF-16LE with BOM (FF FE) for the NSIS license screen"
+            exit 1
+          }
+          Write-Host "OK LICENSE_RU.txt is UTF-16LE with BOM"
+      - name: Build Windows EXE (NSIS, license screen)
         run: npx tsc && node prepare-mod-dist.mjs && npx electron-builder --win
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -46,6 +64,17 @@ jobs:
           Write-Host "app.asar OK"
           node_modules\.bin\electron.cmd scripts\smoke-packaged.js
           if ($LASTEXITCODE -ne 0) { Write-Error "smoke test failed"; exit 1 }
+      - name: Show installer license wiring (beta.24)
+        shell: pwsh
+        run: |
+          $pkg = Get-Content package.json -Raw | ConvertFrom-Json
+          if (-not $pkg.build.nsis) { Write-Error "nsis config missing"; exit 1 }
+          if ($pkg.build.nsis.license -ne "legal/LICENSE_RU.txt") { Write-Error "nsis.license not wired"; exit 1 }
+          Write-Host "nsis.license =" $pkg.build.nsis.license
+          Write-Host "oneClick =" $pkg.build.nsis.oneClick
+          Write-Host "languages =" ($pkg.build.nsis.installerLanguages -join ",")
+          if (-not $pkg.build.files.Contains("legal/**/*")) { Write-Error "legal not packaged"; exit 1 }
+          Write-Host "legal packaged: OK"
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -56,6 +85,8 @@ jobs:
             dist/beta.yml
             dist/alpha.yml
             dist/latest.yml
+            legal/*.txt
+            legal/*.md
           if-no-files-found: error
       - name: Show updater metadata (beta.yml/alpha.yml)
         shell: pwsh
@@ -80,6 +111,17 @@ jobs:
           powershell -ExecutionPolicy Bypass -File mod\BUILD-MOD.ps1
           if ($LASTEXITCODE -ne 0) { Write-Error "mod build failed"; exit 1 }
       - run: npm ci
+      - name: Verify legal documents present (beta.24)
+        run: |
+          for f in legal/LICENSE_RU.txt legal/LICENSE_EN.txt legal/PRIVACY_RU.md legal/PRIVACY_EN.md; do
+            test -f "$f" || { echo "missing $f"; exit 1; }
+            echo "OK $f ($(wc -c < "$f") bytes)"
+          done
+          # LICENSE_RU.txt: BOM UTF-16LE (FF FE) — иначе NSIS-экран лицензии покажет кракозябры.
+          # Сравниваем первые 2 байта побайтово (устойчиво к формату od на macOS/Linux).
+          bom="$(head -c 2 legal/LICENSE_RU.txt | xxd -p)"
+          [ "$bom" = "fffe" ] || { echo "LICENSE_RU.txt must be UTF-16LE with BOM (got $bom)"; exit 1; }
+          echo "OK LICENSE_RU.txt is UTF-16LE with BOM"
       - run: npm test
       - run: npx tsc && node prepare-mod-dist.mjs && npx electron-builder --mac
         env:
@@ -93,4 +135,6 @@ jobs:
             dist/beta-mac.yml
             dist/alpha-mac.yml
             dist/latest-mac.yml
+            legal/*.txt
+            legal/*.md
           if-no-files-found: error
